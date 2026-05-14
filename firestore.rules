@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Eingeloggte Benutzer können ihre eigenen Daten lesen/schreiben
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Spaces: Mitglieder können lesen, Owner kann schreiben
+    match /spaces/{spaceId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isAuth() &&
+        (resource.data.ownerId == request.auth.uid ||
+         request.auth.uid in resource.data.memberIds);
+    }
+
+    // Produkte: eingeloggte Nutzer können lesen/schreiben
+    match /products/{productId} {
+      allow read, write: if isAuth();
+    }
+
+    // Abbuchungen: eingeloggte Nutzer können lesen/erstellen
+    match /bookings/{bookingId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+    }
+
+    // Benutzerprofile
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && request.auth.uid == userId;
+    }
+  }
+}
