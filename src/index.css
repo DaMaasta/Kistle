@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS-Variablen ─────────────────────────────────────────────────────────── */
+:root {
+  --c-bg:         #eef0f3;
+  --c-surface:    #ffffff;
+  --c-surface-2:  #e5e8ed;
+  --c-surface-3:  #eef0f3;
+  --c-text-1:     #0f172a;
+  --c-text-2:     #64748b;
+  --c-text-3:     #94a3b8;
+  --c-text-4:     #cbd5e1;
+  --c-border:     #dde1e8;
+  --c-border-2:   #e5e8ed;
+  --c-accent-bg:  #fff3e8;
+  --c-dark-btn:   #0f172a;
+  --c-dark-btn-text: #ffffff;
+  --c-brand:      #f97316;
+  --c-brand-dark: #ea580c;
+}
+
+.dark {
+  --c-bg:         #0f172a;
+  --c-surface:    #1e293b;
+  --c-surface-2:  #334155;
+  --c-surface-3:  #1e293b;
+  --c-text-1:     #f1f5f9;
+  --c-text-2:     #94a3b8;
+  --c-text-3:     #64748b;
+  --c-text-4:     #475569;
+  --c-border:     #334155;
+  --c-border-2:   #1e293b;
+  --c-accent-bg:  #431407;
+  --c-dark-btn:   #f1f5f9;
+  --c-dark-btn-text: #0f172a;
+  --c-brand:      #f97316;
+  --c-brand-dark: #ea580c;
+}
+
+/* ─── Animationen ────────────────────────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-transition {
+  animation: pageIn 0.2s ease-out;
+}
+
+/* ─── Tailwind base ──────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    background-color: var(--c-bg);
+    font-family: 'Inter', 'Helvetica Neue', sans-serif;
+    @apply text-slate-900 antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ─── Interactive feedback ───────────────────────────────────────────────────── */
+button {
+  transition: opacity 0.12s ease, transform 0.1s ease, background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+button:active:not(:disabled) {
+  transform: scale(0.96);
+  opacity: 0.88;
+}
+
+input, textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input:focus, textarea:focus {
+  border-color: #f97316 !important;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15) !important;
+  outline: none !important;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-orange-500 text-white px-4 py-2 rounded-xl hover:bg-orange-600 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-slate-100 text-slate-700 px-4 py-2 rounded-xl hover:bg-slate-200 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .input-field {
+    @apply w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none bg-white text-slate-900;
+  }
+}
