@@ -1,9 +1,11 @@
-import React, { useState, useEffect, CSSProperties } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import type { CSSProperties } from "react";
 import { Search, Package, ShoppingCart } from "lucide-react";
 import type { NavigateFn } from "../App";
 import type { Product, Space } from "../types";
-import { subscribeToAllProducts } from "../services/products.service";
-import { subscribeToAllSpaces } from "../services/spaces.service";
+import { subscribeToProductsInSpaces } from "../services/products.service";
+import { subscribeToUserSpaces, subscribeToSpacesByParentIds } from "../services/spaces.service";
+import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import QuantityModal from "../components/QuantityModal";
 
@@ -11,59 +13,94 @@ interface SearchPageProps {
   navigate: NavigateFn;
 }
 
+const COLOR_NAMES: Record<string, string> = {
+  "#f97316": "orange",
+  "#ef4444": "rot",
+  "#eab308": "gelb",
+  "#22c55e": "grün",
+  "#14b8a6": "türkis",
+  "#3b82f6": "blau",
+  "#8b5cf6": "lila",
+  "#ec4899": "pink",
+};
+
 export default function SearchPage({ navigate }: SearchPageProps): React.ReactElement {
+  const { user } = useAuth();
   const { addToCart, items: cartItems } = useCart();
-  const [query, setQuery]         = useState("");
-  const [products, setProducts]   = useState<Product[]>([]);
-  const [spaces, setSpaces]       = useState<Space[]>([]);
+  const [query, setQuery]     = useState("");
+  const [userGroups, setUserGroups] = useState<Space[]>([]);
+  const [boxes, setBoxes]     = useState<Space[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [modalProduct, setModalProduct] = useState<{ product: Product; box: Space; parent: Space | undefined } | null>(null);
 
-  useEffect(() => subscribeToAllProducts(setProducts), []);
-  useEffect(() => subscribeToAllSpaces(setSpaces), []);
+  useEffect(() => {
+    if (!user) return;
+    return subscribeToUserSpaces(user.uid, (spaces) => {
+      setUserGroups(spaces.filter((s) => s.isGroup));
+    });
+  }, [user]);
 
-  const spaceMap = new Map(spaces.map((s) => [s.id, s]));
+  const groupIds = useMemo(() => userGroups.map((g) => g.id), [userGroups]);
+  const groupIdsKey = groupIds.join(",");
+  useEffect(() => {
+    if (groupIds.length === 0) { setBoxes([]); return; }
+    return subscribeToSpacesByParentIds(groupIds, setBoxes);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupIdsKey]);
+
+  const allSpaceIds = useMemo(() => [...groupIds, ...boxes.map((b) => b.id)], [groupIds, boxes]);
+  const allSpaceIdsKey = allSpaceIds.join(",");
+  useEffect(() => {
+    if (allSpaceIds.length === 0) { setProducts([]); return; }
+    return subscribeToProductsInSpaces(allSpaceIds, setProducts);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allSpaceIdsKey]);
+
+  const spaceMap = useMemo(() => {
+    const map = new Map<string, Space>();
+    userGroups.forEach((g) => map.set(g.id, g));
+    boxes.forEach((b) => map.set(b.id, b));
+    return map;
+  }, [userGroups, boxes]);
 
   const q = query.trim().toLowerCase();
-  const results = q.length >= 2
-    ? products.filter((p) =>
-        p.quantity > 0 && (
-          p.name.toLowerCase().includes(q) ||
-          p.description.toLowerCase().includes(q) ||
-          (spaceMap.get(p.spaceId)?.name ?? "").toLowerCase().includes(q)
-        )
-      )
-    : [];
 
-  const handleOpen = (p: Product) => {
-    const box = spaceMap.get(p.spaceId);
-    if (!box) return;
-    const parent = box.parentId ? spaceMap.get(box.parentId) : undefined;
-    navigate("BoxDetail", { box, place: parent ?? null });
-  };
+  const results = useMemo(() => {
+    const base = products.filter((p) => p.quantity > 0);
+    if (q.length === 0) return base;
+    return base.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      p.description.toLowerCase().includes(q) ||
+      (spaceMap.get(p.spaceId)?.name ?? "").toLowerCase().includes(q) ||
+      (p.color ? (COLOR_NAMES[p.color] ?? "").includes(q) : false)
+    );
+  }, [q, products, spaceMap]);
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Suche</h1>
-
-      <div style={styles.searchBox}>
-        <Search size={18} color="#94a3b8" />
-        <input
-          style={styles.input}
-          placeholder="Name oder Beschreibung..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          autoFocus
-        />
+      <div style={styles.stickyHeader}>
+        <div style={styles.searchBox}>
+          <Search size={18} color="#94a3b8" />
+          <input
+            style={styles.input}
+            className="search-input"
+            placeholder="Name, Farbe oder Beschreibung..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            inputMode="search"
+            autoComplete="off"
+          />
+        </div>
       </div>
 
-      {q.length < 2 ? (
-        <div style={styles.hint}>
-          <Search size={44} color="var(--c-border)" />
-          <p style={styles.hintText}>Mindestens 2 Zeichen eingeben</p>
-        </div>
-      ) : results.length === 0 ? (
+      {q.length === 0 && results.length === 0 ? (
         <div style={styles.hint}>
           <Package size={44} color="var(--c-border)" />
+          <p style={styles.hintText}>Noch keine Gegenstände in Orten</p>
+        </div>
+      ) : q.length > 0 && results.length === 0 ? (
+        <div style={styles.hint}>
+          <Search size={44} color="var(--c-border)" />
           <p style={styles.hintText}>Keine Ergebnisse für „{query}"</p>
         </div>
       ) : (
@@ -73,11 +110,7 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
             const box    = spaceMap.get(p.spaceId);
             const parent = box?.parentId ? spaceMap.get(box.parentId) : undefined;
             return (
-              <div
-                key={p.id}
-                style={styles.card}
-                onClick={() => handleOpen(p)}
-              >
+              <div key={p.id} style={{ ...styles.card, cursor: "pointer" }} onClick={() => navigate("ItemView", { product: p, box, parent, from: "SearchPage" })}>
                 <div style={styles.item}>
                   <div style={styles.itemImg}>
                     {p.imageUrl
@@ -87,18 +120,26 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
                   </div>
                   <div style={styles.itemInfo}>
                     <div style={styles.itemName}>{p.name}</div>
+                    {p.description ? (
+                      <div style={styles.itemDesc}>{p.description}</div>
+                    ) : null}
                     <div style={styles.itemAvail}>
                       <span style={styles.itemQtyNum}>{p.quantity}</span>
+                      <span style={styles.itemUnit}> {p.unit}</span>
                     </div>
+                    {(parent || box) && (
+                      <div style={styles.itemLocation}>
+                        {parent ? `${parent.name} › ${box?.name}` : box?.name}
+                      </div>
+                    )}
                   </div>
                   <button
-                    style={{ ...styles.cartBtn, opacity: p.quantity === 0 ? 0.35 : 1, background: inCart ? "#c2410c" : "#f97316" }}
+                    style={{ ...styles.cartBtn, background: inCart ? "#c2410c" : "#f97316" }}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!box) return;
                       setModalProduct({ product: p, box, parent });
                     }}
-                    disabled={p.quantity === 0}
                     title="Zum Warenkorb hinzufügen"
                   >
                     <ShoppingCart size={18} color="#fff" />
@@ -137,25 +178,32 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
 }
 
 const styles: Record<string, CSSProperties> = {
-  container: { padding: "20px 16px" },
-  title:    { fontSize: 28, fontWeight: 800, color: "var(--c-text-1)", margin: 0, marginBottom: 16 },
+  container: { padding: "0 0 0 0" },
+  stickyHeader: {
+    position: "sticky", top: 0, zIndex: 10,
+    background: "linear-gradient(to bottom, var(--c-bg) 70%, transparent 100%)",
+    padding: "12px 16px 18px",
+  },
   searchBox: {
     display: "flex", alignItems: "center", gap: 10,
-    background: "var(--c-surface)", border: "2px solid #f97316", borderRadius: 14,
-    padding: "0 16px", marginBottom: 20,
+    background: "var(--c-surface)", border: "1.5px solid var(--c-border)", borderRadius: 14,
+    padding: "0 16px",
   },
-  input: { flex: 1, border: "none", outline: "none", fontSize: 14, color: "var(--c-text-1)", background: "transparent", padding: "13px 0" },
+  input: { flex: 1, border: "none", outline: "none", fontSize: 16, color: "var(--c-text-1)", background: "transparent", padding: "13px 0" },
   hint: { textAlign: "center", padding: "60px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
   hintText: { fontSize: 14, color: "var(--c-text-3)" },
-  list: { display: "flex", flexDirection: "column", gap: 10 },
-  card: { background: "var(--c-surface)", borderRadius: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", overflow: "hidden", cursor: "pointer" },
-  item: { display: "flex", alignItems: "center", gap: 14, padding: "14px 16px" },
-  itemImg: { width: 52, height: 52, borderRadius: 14, background: "var(--c-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" },
+  list: { display: "flex", flexDirection: "column", gap: 8, padding: "0 16px calc(env(safe-area-inset-bottom) + 90px)" },
+  card: { background: "var(--c-surface)", borderRadius: 16, boxShadow: "var(--neu-raised-sm)", overflow: "hidden" },
+  item: { display: "flex", alignItems: "center", gap: 12, padding: "10px 14px" },
+  itemImg: { width: 64, height: 64, borderRadius: 12, background: "var(--c-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" },
   itemImgEl: { width: "100%", height: "100%", objectFit: "cover" },
-  itemInitial: { fontSize: 22, fontWeight: 700, color: "var(--c-text-3)" },
+  itemInitial: { fontSize: 18, fontWeight: 700, color: "var(--c-text-3)" },
   itemInfo: { flex: 1, minWidth: 0 },
-  itemName: { fontSize: 15, fontWeight: 700, color: "var(--c-text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  itemName: { fontSize: 14, fontWeight: 700, color: "var(--c-text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  itemDesc: { fontSize: 12, color: "var(--c-text-3)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   itemAvail: { display: "flex", alignItems: "baseline", marginTop: 3 },
-  itemQtyNum: { fontSize: 20, fontWeight: 800, color: "var(--c-text-1)" },
-  cartBtn: { border: "none", borderRadius: 14, width: 46, height: 46, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" },
+  itemQtyNum: { fontSize: 15, fontWeight: 800, color: "var(--c-text-1)" },
+  itemUnit: { fontSize: 12, color: "var(--c-text-3)", marginLeft: 3 },
+  itemLocation: { fontSize: 11, color: "#f97316", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" },
+  cartBtn: { border: "none", borderRadius: 11, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
 };

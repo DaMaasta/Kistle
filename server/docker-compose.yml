@@ -1,0 +1,20 @@
+version: "3.9"
+
+# Dieses docker-compose ergänzt den bestehenden Stack.
+# Entweder in den bestehenden docker-compose.yml einbauen
+# oder mit: docker compose -f docker-compose.yml up -d
+
+services:
+  webapp:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /mnt/data:/mnt/data
+    networks:
+      - kistle-net
+    # Kein Port nach außen — nginx proxyt intern
+
+networks:
+  kistle-net:
+    external: true   # Muss im bestehenden Stack existieren oder anpassen

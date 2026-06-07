@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, CSSProperties } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import { Plus, Minus, Trash2, Camera, X, Pencil, ShoppingCart, Package } from "lucide-react";
 import type { Space, Product, ProductUnit } from "../types";
 import { useAuth } from "../contexts/AuthContext";
@@ -33,6 +34,7 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
   const [saving, setSaving]               = useState(false);
   const [deleteId, setDeleteId]           = useState<string | null>(null);
   const [hoveredId, setHoveredId]         = useState<string | null>(null);
+  const [deleteError, setDeleteError]     = useState<string | null>(null);
   const [modalProduct, setModalProduct]   = useState<Product | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,8 +94,14 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
     } finally { setSaving(false); }
   };
 
-  const handleDelete = (id: string) => {
-    deleteProduct(id);
+  const handleDelete = async (id: string) => {
+    setDeleteError(null);
+    try {
+      await deleteProduct(id);
+    } catch {
+      setDeleteError("Löschen fehlgeschlagen. Bitte erneut versuchen.");
+      return;
+    }
     setDeleteId(null);
     if (editProductId === id) resetForm();
   };
@@ -173,6 +181,11 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
         </div>
       )}
 
+      {deleteError && (
+        <div style={{ fontSize: 13, color: "#ef4444", background: "#fef2f2", borderRadius: 10, padding: "8px 12px", marginBottom: 10 }}>
+          {deleteError}
+        </div>
+      )}
       {products.length === 0 && !showForm ? (
         <div style={styles.emptyState}>
           <Package size={40} color="var(--c-border)" />

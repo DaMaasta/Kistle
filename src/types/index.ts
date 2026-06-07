@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'editor' | 'viewer';
+export type UserRole = 'admin' | 'editor' | 'viewer';
 
 export interface SpaceMember {
   userId: string;
@@ -19,6 +19,7 @@ export interface Space {
   icon: string;
   color: string;
   isGroup: boolean;
+  accessCode?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +37,7 @@ export interface Product {
   description: string;
   barcode: string | null;
   imageUrl: string | null;
+  color?: string;
   lastModifiedBy: string;
   lastModifiedByEmail: string;
   lastModifiedAt: Date;
@@ -75,6 +77,9 @@ export interface Booking {
   createdAt: Date;
   parentIds: string[];
   items: BookingItem[];
+  type: "booking" | "return";
+  originalBookingId?: string;
+  isReturned?: boolean;
 }
 
 export interface UserProfile {
@@ -82,4 +87,16 @@ export interface UserProfile {
   email: string;
   displayName: string;
   createdAt: Date;
+}
+
+export interface AppNotification {
+  id: string;
+  targetUserId: string;
+  type: 'booking';
+  message: string;
+  bookingUserName: string;
+  groupId: string;
+  groupName: string;
+  createdAt: Date;
+  read: boolean;
 }

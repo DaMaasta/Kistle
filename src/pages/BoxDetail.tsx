@@ -1,18 +1,15 @@
-import React, { useState, useEffect, useRef, CSSProperties } from "react";
-import { ChevronLeft, Plus, Minus, Trash2, Camera, X, Pencil, Check, ShoppingCart } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
+import { Plus, Minus, Camera, X, ShoppingCart, Package } from "lucide-react";
 import type { NavigateFn, PageParams } from "../App";
 import type { Space, Product, ProductUnit } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
+import { useHeader } from "../contexts/HeaderContext";
 import { compressImageToBase64 } from "../utils/imageUtils";
 import QuantityModal from "../components/QuantityModal";
-import {
-  subscribeToSpaceProducts,
-  createProduct,
-  updateProduct,
-  updateQuantity,
-  deleteProduct,
-} from "../services/products.service";
+import { subscribeToSpaceProducts, createProduct } from "../services/products.service";
+import { subscribeToSpace } from "../services/spaces.service";
 
 interface BoxDetailProps {
   navigate: NavigateFn;
@@ -23,136 +20,119 @@ const UNITS: ProductUnit[] = ["Stück", "kg", "g", "L", "ml", "Packung", "Flasch
 const emptyForm = { name: "", description: "", quantity: 1, unit: "Stück" as ProductUnit };
 
 export default function BoxDetail({ navigate, params }: BoxDetailProps): React.ReactElement {
-  const box   = params.box   as Space;
-  const place = params.place as Space;
+  const box          = params.box   as Space;
+  const passedPlace  = params.place as Space | null | undefined;
   const { user } = useAuth();
   const { addToCart, items: cartItems } = useCart();
+  const { setHeader } = useHeader();
 
-  const [products, setProducts]       = useState<Product[]>([]);
-  const [showForm, setShowForm]       = useState(false);
-  const [editProductId, setEditProductId] = useState<string | null>(null);
-  const [form, setForm]               = useState(emptyForm);
-  const [imageFile, setImageFile]     = useState<File | null>(null);
-  const [preview, setPreview]         = useState<string | null>(null);
-  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
-  const [saving, setSaving]           = useState(false);
-  const [deleteId, setDeleteId]       = useState<string | null>(null);
-  const [hoveredId, setHoveredId]     = useState<string | null>(null);
+  const [products,    setProducts]    = useState<Product[]>([]);
+  const [parentSpace, setParentSpace] = useState<Space | null>(passedPlace ?? null);
+  const [showForm,    setShowForm]    = useState(false);
+  const [form,        setForm]        = useState(emptyForm);
+  const [qtyText,     setQtyText]     = useState("1");
+  const [imageFile,   setImageFile]   = useState<File | null>(null);
+  const [preview,     setPreview]     = useState<string | null>(null);
+  const [saving,      setSaving]      = useState(false);
   const [modalProduct, setModalProduct] = useState<Product | null>(null);
 
+  const place    = parentSpace;
+  const isViewer = place?.members?.[user?.uid ?? ""]?.role === "viewer";
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setHeader({
+      title: box?.name ?? "Box",
+      onBack: () => navigate("GroupDetail", { group: place }),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [box?.name]);
 
   useEffect(() => {
     if (!box?.id) return;
     return subscribeToSpaceProducts(box.id, setProducts);
   }, [box?.id]);
 
+  // Fetch parent space if not passed (e.g. navigating from SearchPage)
+  useEffect(() => {
+    if (passedPlace) { setParentSpace(passedPlace); return; }
+    if (!box?.parentId) return;
+    return subscribeToSpace(box.parentId, (s) => { if (s) setParentSpace(s); });
+  }, [passedPlace, box?.parentId]);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
-    if (preview && !existingImageUrl) URL.revokeObjectURL(preview);
+    if (preview) URL.revokeObjectURL(preview);
     setPreview(URL.createObjectURL(file));
   };
 
   const resetForm = () => {
     setForm(emptyForm);
+    setQtyText("1");
     setImageFile(null);
-    setExistingImageUrl(null);
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
     setShowForm(false);
-    setEditProductId(null);
-  };
-
-  const startEdit = (p: Product) => {
-    setEditProductId(p.id);
-    setForm({ name: p.name, description: p.description, quantity: p.quantity, unit: p.unit });
-    setExistingImageUrl(p.imageUrl);
-    setPreview(p.imageUrl);
-    setImageFile(null);
-    setShowForm(true);
-    setDeleteId(null);
   };
 
   const handleSave = async () => {
     if (!form.name.trim() || !user || saving) return;
     setSaving(true);
     try {
-      let imageUrl: string | null = existingImageUrl;
-
-      if (imageFile) {
-        imageUrl = await compressImageToBase64(imageFile);
-      }
-
-      if (editProductId) {
-        await updateProduct(editProductId, user.uid, user.email ?? "", {
-          name: form.name.trim(), description: form.description.trim(),
-          quantity: form.quantity, unit: form.unit, imageUrl,
-        });
-      } else {
-        await createProduct(box.id, user.uid, user.email ?? "", {
-          name: form.name.trim(), description: form.description.trim(),
-          quantity: form.quantity, unit: form.unit,
-          minQuantity: null, category: "", barcode: null, imageUrl,
-        });
-      }
+      let imageUrl: string | null = null;
+      if (imageFile) imageUrl = await compressImageToBase64(imageFile);
+      await createProduct(box.id, user.uid, user.email ?? "", {
+        name: form.name.trim(), description: form.description.trim(),
+        quantity: form.quantity, unit: form.unit,
+        minQuantity: null, category: "", barcode: null, imageUrl,
+      });
       resetForm();
     } finally { setSaving(false); }
   };
 
-  const handleQuantity = (p: Product, delta: number) => {
-    if (!user) return;
-    updateQuantity(p.id, user.uid, user.email ?? "", Math.max(0, p.quantity + delta));
-  };
-
-  const handleDelete = (id: string) => {
-    deleteProduct(id);
-    setDeleteId(null);
-  };
-
   return (
     <div style={styles.container}>
-      <button style={styles.back} onClick={() =>
-        place?.isGroup
-          ? navigate("GroupDetail", { group: place })
-          : navigate("PlaceDetail", { place })
-      }>
-        <ChevronLeft size={16} color="#f97316" />
-        <span style={styles.backText}>Zurück zu {place?.name ?? "Place"}</span>
-      </button>
+      {isViewer && (
+        <div style={styles.viewerBanner}>
+          Nur Ansicht — du kannst keine Artikel abbuchen
+        </div>
+      )}
 
       <div style={styles.header}>
         <div>
-          <h1 style={styles.title}>📦 {box?.name ?? "Box"}</h1>
+          <h1 style={styles.title}>{box?.name ?? "Box"}</h1>
           <p style={styles.subtitle}>{products.length} Gegenstand{products.length !== 1 ? "e" : ""}</p>
         </div>
-        <button style={styles.newBtn} onClick={() => { resetForm(); setShowForm(true); }}>
-          <Plus size={16} color="#fff" /> Hinzufügen
-        </button>
+        {!isViewer && (
+          <button style={styles.newBtn} onClick={() => { resetForm(); setShowForm(true); }}>
+            <Plus size={16} color="#fff" /> Hinzufügen
+          </button>
+        )}
       </div>
 
-      {/* Formular (Neu oder Bearbeiten) */}
-      {showForm && (
+      {/* Formular: Neuer Gegenstand */}
+      {!isViewer && showForm && (
         <div style={styles.formCard}>
           <div style={styles.formHeader}>
-            <span style={styles.formTitle}>{editProductId ? "Gegenstand bearbeiten" : "Neuer Gegenstand"}</span>
+            <span style={styles.formTitle}>Neuer Gegenstand</span>
             <button style={styles.closeBtn} onClick={resetForm}><X size={18} color="var(--c-text-3)" /></button>
           </div>
 
           <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageChange} />
           <button style={styles.imagePicker} onClick={() => fileInputRef.current?.click()}>
-            {preview ? (
-              <img src={preview} alt="Vorschau" style={styles.imagePreview} />
-            ) : (
-              <><Camera size={22} color="var(--c-text-3)" /><span style={styles.imagePickerText}>Foto hinzufügen</span></>
-            )}
+            {preview
+              ? <img src={preview} alt="Vorschau" style={styles.imagePreview} />
+              : <><Camera size={22} color="var(--c-text-3)" /><span style={styles.imagePickerText}>Foto hinzufügen</span></>
+            }
           </button>
 
           <div style={styles.field}>
             <label style={styles.label}>Name *</label>
             <input style={styles.input} placeholder="z.B. Schraubenzieher" value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus={!editProductId} />
+              onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
           </div>
 
           <div style={styles.field}>
@@ -165,9 +145,22 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
             <div style={{ ...styles.field, flex: 1 }}>
               <label style={styles.label}>Anzahl</label>
               <div style={styles.qtyRow}>
-                <button style={styles.qtyBtn} onClick={() => setForm({ ...form, quantity: Math.max(1, form.quantity - 1) })}><Minus size={14} /></button>
-                <span style={styles.qtyVal}>{form.quantity}</span>
-                <button style={styles.qtyBtn} onClick={() => setForm({ ...form, quantity: form.quantity + 1 })}><Plus size={14} /></button>
+                <button style={styles.qtyBtn} onClick={() => { const n = Math.max(1, form.quantity - 1); setForm({ ...form, quantity: n }); setQtyText(String(n)); }}><Minus size={14} /></button>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  style={styles.qtyVal}
+                  value={qtyText}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, "");
+                    setQtyText(raw);
+                    const n = parseInt(raw);
+                    if (!isNaN(n) && n >= 1) setForm({ ...form, quantity: n });
+                  }}
+                  onBlur={() => setQtyText(String(form.quantity))}
+                />
+                <button style={styles.qtyBtn} onClick={() => { const n = form.quantity + 1; setForm({ ...form, quantity: n }); setQtyText(String(n)); }}><Plus size={14} /></button>
               </div>
             </div>
             <div style={{ ...styles.field, flex: 1 }}>
@@ -179,96 +172,67 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
           </div>
 
           <button style={{ ...styles.saveBtn, opacity: saving ? 0.7 : 1 }} onClick={handleSave} disabled={saving}>
-            {saving ? "Wird gespeichert…" : editProductId ? "Änderungen speichern" : "Speichern"}
+            {saving ? "Wird gespeichert…" : "Speichern"}
           </button>
-
-          {editProductId && (
-            deleteId === editProductId ? (
-              <div style={styles.deleteConfirm}>
-                <span style={styles.deleteConfirmText}>Gegenstand wirklich löschen?</span>
-                <div style={styles.deleteConfirmBtns}>
-                  <button style={styles.confirmDeleteBtn} onClick={() => { handleDelete(editProductId); resetForm(); }}>Löschen</button>
-                  <button style={styles.cancelSmBtn} onClick={() => setDeleteId(null)}>Abbrechen</button>
-                </div>
-              </div>
-            ) : (
-              <button style={styles.deleteBtn} onClick={() => setDeleteId(editProductId)}>
-                <Trash2 size={15} color="#ef4444" /> Gegenstand löschen
-              </button>
-            )
-          )}
         </div>
       )}
 
       {/* Produktliste */}
       {products.length === 0 && !showForm ? (
         <div style={styles.emptyState}>
-          <span style={{ fontSize: 48 }}>📦</span>
+          <Package size={48} color="var(--c-border)" />
           <p style={styles.emptyText}>Die Box ist leer</p>
-          <button style={styles.emptyBtn} onClick={() => setShowForm(true)}>
-            <Plus size={14} color="#f97316" /> Ersten Gegenstand hinzufügen
-          </button>
+          {!isViewer && (
+            <button style={styles.emptyBtn} onClick={() => setShowForm(true)}>
+              <Plus size={14} color="#f97316" /> Ersten Gegenstand hinzufügen
+            </button>
+          )}
         </div>
       ) : (
         <div style={styles.list}>
           {products.map((p) => {
-            const inCart   = cartItems.some(ci => ci.productId === p.id);
-            const isHovered = hoveredId === p.id;
+            const inCart = cartItems.some((ci) => ci.productId === p.id);
             return (
               <div
                 key={p.id}
                 style={styles.card}
-                onMouseEnter={() => setHoveredId(p.id)}
-                onMouseLeave={() => setHoveredId(null)}
+                onClick={() => navigate("ProductDetail", { product: p, box, place })}
               >
-                {deleteId === p.id ? (
-                  <div style={styles.deleteRow}>
-                    <span style={styles.deleteText}>„{p.name}" löschen?</span>
-                    <button style={styles.confirmDeleteBtn} onClick={() => handleDelete(p.id)}>Löschen</button>
-                    <button style={styles.cancelSmBtn} onClick={() => setDeleteId(null)}>Nein</button>
+                <div style={styles.item}>
+                  <div style={styles.itemImg}>
+                    {p.imageUrl
+                      ? <img src={p.imageUrl} alt={p.name} style={styles.itemImgEl} />
+                      : <span style={styles.itemInitial}>{p.name[0]?.toUpperCase() ?? "?"}</span>
+                    }
                   </div>
-                ) : (
-                  <div style={styles.item}>
-                    <div style={styles.itemImg}>
-                      {p.imageUrl
-                        ? <img src={p.imageUrl} alt={p.name} style={styles.itemImgEl} />
-                        : <span style={styles.itemInitial}>{p.name[0]?.toUpperCase() ?? "?"}</span>
-                      }
+                  <div style={styles.itemInfo}>
+                    <div style={styles.itemName}>{p.name}</div>
+                    <div style={styles.itemAvail}>
+                      <span style={styles.itemQtyNum}>{p.quantity}</span>
+                      <span style={styles.itemUnit}> {p.unit}</span>
                     </div>
-                    <div style={styles.itemInfo}>
-                      <div style={styles.itemNameRow}>
-                        <span style={styles.itemName}>{p.name}</span>
-                        <button
-                          style={{ ...styles.pencilBtn, opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? "auto" : "none" }}
-                          onClick={() => startEdit(p)}
-                        >
-                          <Pencil size={14} color="var(--c-text-3)" />
-                        </button>
-                      </div>
-                      <div style={styles.itemAvail}>
-                        <span style={styles.itemQtyNum}>{p.quantity}</span>
-                      </div>
-                    </div>
+                  </div>
+                  {!isViewer && (
                     <button
                       style={{ ...styles.cartBtn, opacity: p.quantity === 0 ? 0.35 : 1, background: inCart ? "#c2410c" : "#f97316" }}
-                      onClick={() => setModalProduct(p)}
+                      onClick={(e) => { e.stopPropagation(); setModalProduct(p); }}
                       disabled={p.quantity === 0}
                       title="Zum Warenkorb hinzufügen"
                     >
                       <ShoppingCart size={18} color="#fff" />
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
       )}
 
-      {modalProduct && (
+      {!isViewer && modalProduct && (
         <QuantityModal
           product={modalProduct}
-          initialQty={cartItems.find(ci => ci.productId === modalProduct.id)?.cartQuantity ?? 1}
+          initialQty={cartItems.find((ci) => ci.productId === modalProduct.id)?.cartQuantity ?? 1}
           onConfirm={(qty) => {
             addToCart({
               productId: modalProduct.id,
@@ -292,52 +256,42 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
 
 const styles: Record<string, CSSProperties> = {
   container: { padding: "16px" },
-  back: { display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", marginBottom: 16 },
+  back:     { display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", marginBottom: 16 },
+  viewerBanner: { background: "var(--c-surface-2)", borderRadius: 10, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "var(--c-text-3)", marginBottom: 12, textAlign: "center" as const },
   backText: { color: "#f97316", fontSize: 14, fontWeight: 600 },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
-  title: { fontSize: 26, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
+  header:   { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
+  title:    { fontSize: 26, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
   subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4 },
-  newBtn: { display: "flex", alignItems: "center", gap: 6, background: "var(--c-dark-btn)", color: "var(--c-dark-btn-text)", border: "none", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" },
-  formCard: { background: "var(--c-surface)", borderRadius: 20, padding: 20, marginBottom: 20, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", gap: 14 },
+  newBtn:   { display: "flex", alignItems: "center", gap: 6, background: "var(--c-dark-btn)", color: "var(--c-dark-btn-text)", border: "none", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" },
+  formCard: { background: "var(--c-surface)", borderRadius: 20, padding: 20, marginBottom: 20, boxShadow: "var(--neu-raised)", display: "flex", flexDirection: "column", gap: 14 },
   formHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  formTitle: { fontSize: 16, fontWeight: 700, color: "var(--c-text-1)" },
-  closeBtn: { background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex" },
+  formTitle:  { fontSize: 16, fontWeight: 700, color: "var(--c-text-1)" },
+  closeBtn:   { background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", minWidth: 40, minHeight: 40, alignItems: "center", justifyContent: "center" },
   imagePicker: { width: "100%", height: 120, borderRadius: 14, border: "2px dashed var(--c-border)", background: "var(--c-surface-2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", overflow: "hidden", padding: 0 },
-  imagePreview: { width: "100%", height: "100%", objectFit: "cover" },
+  imagePreview:    { width: "100%", height: "100%", objectFit: "cover" },
   imagePickerText: { fontSize: 13, color: "var(--c-text-3)", fontWeight: 500 },
-  field: { display: "flex", flexDirection: "column", gap: 6 },
-  label: { fontSize: 12, fontWeight: 600, color: "var(--c-text-2)", textTransform: "uppercase", letterSpacing: "0.04em" },
-  input: { border: "1px solid var(--c-border)", borderRadius: 10, padding: "10px 12px", fontSize: 14, outline: "none", color: "var(--c-text-1)", background: "var(--c-bg)" },
-  row: { display: "flex", gap: 12 },
+  field:  { display: "flex", flexDirection: "column", gap: 6 },
+  label:  { fontSize: 12, fontWeight: 600, color: "var(--c-text-2)", textTransform: "uppercase", letterSpacing: "0.04em" },
+  input:  { border: "1px solid var(--c-border)", borderRadius: 10, padding: "10px 12px", fontSize: 16, outline: "none", color: "var(--c-text-1)", background: "var(--c-bg)" },
+  row:    { display: "flex", gap: 12 },
   qtyRow: { display: "flex", alignItems: "center", gap: 10, background: "var(--c-surface-2)", borderRadius: 10, padding: "8px 12px" },
-  qtyBtn: { background: "var(--c-border)", border: "none", borderRadius: 6, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
-  qtyVal: { fontSize: 16, fontWeight: 700, color: "var(--c-text-1)", minWidth: 24, textAlign: "center" },
+  qtyBtn: { background: "var(--c-border)", border: "none", borderRadius: 8, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  qtyVal: { fontSize: 16, fontWeight: 700, color: "var(--c-text-1)", minWidth: 24, width: 40, textAlign: "center", border: "none", outline: "none", background: "transparent", padding: 0, fontFamily: "inherit" },
   select: { border: "1px solid var(--c-border)", borderRadius: 10, padding: "10px 12px", fontSize: 14, outline: "none", background: "var(--c-bg)", color: "var(--c-text-1)" },
   saveBtn: { background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer" },
   emptyState: { textAlign: "center", padding: "60px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
-  emptyText: { fontSize: 14, color: "var(--c-text-3)" },
-  emptyBtn: { display: "flex", alignItems: "center", gap: 6, background: "var(--c-accent-bg)", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#f97316", cursor: "pointer" },
-  list: { display: "flex", flexDirection: "column", gap: 10 },
-  card: { background: "var(--c-surface)", borderRadius: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", overflow: "hidden" },
-  item: { display: "flex", alignItems: "center", gap: 14, padding: "14px 16px" },
-  itemImg: { width: 52, height: 52, borderRadius: 14, background: "var(--c-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" },
-  itemImgEl: { width: "100%", height: "100%", objectFit: "cover" },
-  itemInitial: { fontSize: 22, fontWeight: 700, color: "var(--c-text-3)" },
-  itemInfo: { flex: 1, minWidth: 0 },
-  itemNameRow: { display: "flex", alignItems: "center", gap: 8 },
-  itemName: { fontSize: 15, fontWeight: 700, color: "var(--c-text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  pencilBtn: { background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex", alignItems: "center", flexShrink: 0, transition: "opacity 0.15s" },
-  itemAvail: { display: "flex", alignItems: "baseline", marginTop: 3 },
-  itemQtyNum: { fontSize: 20, fontWeight: 800, color: "var(--c-text-1)" },
-  itemQtyLabel: { fontSize: 13, color: "#22c55e", fontWeight: 500 },
-  cartBtn: { border: "none", borderRadius: 14, width: 46, height: 46, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" },
-  iconBtn: { background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center" },
-  deleteRow: { display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", flexWrap: "wrap" },
-  deleteText: { flex: 1, fontSize: 13, color: "var(--c-text-1)", fontWeight: 500 },
-  confirmDeleteBtn: { background: "#ef4444", border: "none", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff" },
-  cancelSmBtn: { background: "var(--c-surface-2)", border: "none", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--c-text-2)" },
-  deleteBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "none", border: "1px solid #fca5a5", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, color: "#ef4444", cursor: "pointer", width: "100%" },
-  deleteConfirm: { background: "#fef2f2", borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 },
-  deleteConfirmText: { fontSize: 13, fontWeight: 600, color: "#991b1b" },
-  deleteConfirmBtns: { display: "flex", gap: 8 },
+  emptyText:  { fontSize: 14, color: "var(--c-text-3)" },
+  emptyBtn:   { display: "flex", alignItems: "center", gap: 6, background: "var(--c-accent-bg)", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#f97316", cursor: "pointer" },
+  list: { display: "flex", flexDirection: "column", gap: 8 },
+  card: { background: "var(--c-surface)", borderRadius: 16, boxShadow: "var(--neu-raised-sm)", overflow: "hidden", cursor: "pointer" },
+  item: { display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" },
+  itemImg:    { width: 64, height: 64, borderRadius: 12, background: "var(--c-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" },
+  itemImgEl:  { width: "100%", height: "100%", objectFit: "cover" },
+  itemInitial:{ fontSize: 17, fontWeight: 700, color: "var(--c-text-3)" },
+  itemInfo:   { flex: 1, minWidth: 0 },
+  itemName:   { fontSize: 14, fontWeight: 700, color: "var(--c-text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  itemAvail:  { display: "flex", alignItems: "baseline", gap: 2, marginTop: 2 },
+  itemQtyNum: { fontSize: 16, fontWeight: 800, color: "var(--c-text-1)" },
+  itemUnit:   { fontSize: 12, color: "var(--c-text-3)", fontWeight: 500 },
+  cartBtn:    { border: "none", borderRadius: 11, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" },
 };

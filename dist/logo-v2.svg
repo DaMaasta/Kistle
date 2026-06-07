@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+
+  <!-- Pixel-art K — 4 cols × 5 rows, pixel=52px gap=8px step=60px, offset=(140,110) -->
+  <!-- Stem: col0, rows 0-4 (5 squares)                                -->
+  <!-- Upper arm (3): junction(col1,row2) → (col2,row1) → (col3,row0) -->
+  <!-- Lower arm (2): junction(col1,row2) shared → (col2,row3)         -->
+
+  <!-- Stem -->
+  <rect x="140" y="110" width="52" height="52" fill="white"/>
+  <rect x="140" y="170" width="52" height="52" fill="white"/>
+  <rect x="140" y="230" width="52" height="52" fill="white"/>
+  <rect x="140" y="290" width="52" height="52" fill="white"/>
+  <rect x="140" y="350" width="52" height="52" fill="white"/>
+
+  <!-- Upper arm (3 squares going up-right, includes junction) -->
+  <rect x="200" y="230" width="52" height="52" fill="white"/>
+  <rect x="260" y="170" width="52" height="52" fill="white"/>
+  <rect x="320" y="110" width="52" height="52" fill="white"/>
+
+  <!-- Lower arm (2 more squares — junction already drawn above) -->
+  <rect x="260" y="290" width="52" height="52" fill="white"/>
+  <rect x="320" y="350" width="52" height="52" fill="white"/>
+</svg>

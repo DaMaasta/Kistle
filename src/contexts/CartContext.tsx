@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { CartItem } from '../types';
 
@@ -18,8 +18,21 @@ const CartContext = createContext<CartContextType>({
   clearCart: () => {},
 });
 
+function loadCart(): CartItem[] {
+  try {
+    const raw = localStorage.getItem("cart");
+    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(loadCart);
+
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(items));
+  }, [items]);
 
   const addToCart = (incoming: Omit<CartItem, 'cartQuantity'>, quantity = 1) => {
     setItems((prev) => {

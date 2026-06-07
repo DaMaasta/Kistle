@@ -1,10 +1,11 @@
-import React, { CSSProperties, useState, useEffect } from "react";
-import { User, Bell, Moon, ChevronRight, LogOut } from "lucide-react";
+declare const __APP_VERSION__: string;
+import React from "react";
+import type { CSSProperties } from "react";
+import { User, ChevronRight, LogOut, Puzzle } from "lucide-react";
 import type { NavigateFn } from "../App";
 import { useAuth } from "../contexts/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
 import { logoutUser } from "../services/auth.service";
-import { isNotificationSupported, requestNotificationPermission, getNotificationsEnabled, setNotificationsEnabled } from "../services/notifications.service";
+import { getInitials } from "../utils/stringUtils";
 
 interface RowProps {
   icon: React.ElementType;
@@ -40,43 +41,15 @@ function Row({ icon: Icon, label, value, toggle, onToggle, onClick, last }: RowP
   );
 }
 
-export default function Settings({ navigate: _navigate }: { navigate: NavigateFn }): React.ReactElement {
+export default function Settings({ navigate }: { navigate: NavigateFn }): React.ReactElement {
   const { user } = useAuth();
-  const { isDark, toggle } = useTheme();
-
-  const [notifEnabled, setNotifEnabled] = useState(false);
-  const [notifDenied, setNotifDenied]   = useState(false);
-
-  useEffect(() => {
-    if (!isNotificationSupported()) return;
-    setNotifDenied(Notification.permission === "denied");
-    setNotifEnabled(Notification.permission === "granted" && getNotificationsEnabled());
-  }, []);
-
-  const handleNotifToggle = async () => {
-    if (!isNotificationSupported() || notifDenied) return;
-    if (!notifEnabled) {
-      if (Notification.permission !== "granted") {
-        const result = await requestNotificationPermission();
-        if (result !== "granted") { setNotifDenied(result === "denied"); return; }
-      }
-      setNotificationsEnabled(true);
-      setNotifEnabled(true);
-    } else {
-      setNotificationsEnabled(false);
-      setNotifEnabled(false);
-    }
-  };
-
   const displayName = user?.displayName ?? user?.email ?? "Unbekannt";
   const email       = user?.email ?? "";
-  const initials    = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
+  const initials    = getInitials(displayName) || "?";
+  const [logoutConfirm, setLogoutConfirm] = React.useState(false);
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Settings</h1>
-      <p style={styles.subtitle}>Konto und App-Einstellungen</p>
-
       {/* Profil-Karte */}
       <div style={styles.profileCard}>
         <div style={styles.profileAvatar}>{initials}</div>
@@ -89,40 +62,36 @@ export default function Settings({ navigate: _navigate }: { navigate: NavigateFn
       {/* Konto */}
       <div style={styles.sectionLabel}>KONTO</div>
       <div style={styles.section}>
-        <Row icon={User} label="E-Mail" value={email} last />
+        <Row icon={User} label="E-Mail" value={email} onClick={() => navigate("AccountSettings")} last />
       </div>
 
-      {/* App */}
-      <div style={styles.sectionLabel}>APP</div>
+      {/* Erweiterungen */}
+      <div style={styles.sectionLabel}>ERWEITERUNGEN</div>
       <div style={styles.section}>
-        <Row
-          icon={Bell}
-          label="Benachrichtigungen"
-          value={notifDenied ? "Im Browser blockiert" : undefined}
-          toggle={notifDenied ? undefined : notifEnabled}
-          onToggle={handleNotifToggle}
-          last={false}
-        />
-        <Row
-          icon={Moon}
-          label="Dark Mode"
-          toggle={isDark}
-          onToggle={toggle}
-          last
-        />
+        <Row icon={Puzzle} label="Erweiterungen" onClick={() => navigate("Erweiterungen")} last />
       </div>
 
       {/* Abmelden */}
-      <button style={styles.logoutBtn} onClick={logoutUser}>
-        <LogOut size={16} color="#ef4444" />
-        Abmelden
-      </button>
+      {!logoutConfirm ? (
+        <button style={styles.logoutBtn} onClick={() => setLogoutConfirm(true)}>
+          <LogOut size={16} color="#ef4444" />
+          Abmelden
+        </button>
+      ) : (
+        <div style={styles.logoutConfirm}>
+          <span style={styles.logoutConfirmText}>Wirklich abmelden?</span>
+          <button style={styles.logoutConfirmYes} onClick={logoutUser}>Ja</button>
+          <button style={styles.logoutConfirmNo} onClick={() => setLogoutConfirm(false)}>Nein</button>
+        </div>
+      )}
+
+      <p style={styles.version}>Version {__APP_VERSION__}</p>
     </div>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
-  container: { padding: "20px 16px" },
+  container: { padding: "20px 16px", height: "100%", overflowY: "auto" as const },
   title:    { fontSize: 28, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
   subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4, marginBottom: 20 },
   profileCard: {
@@ -139,7 +108,7 @@ const styles: Record<string, CSSProperties> = {
   profileName:  { fontSize: 17, fontWeight: 700, color: "#fff", marginBottom: 2 },
   profileEmail: { fontSize: 13, color: "rgba(255,255,255,0.75)" },
   sectionLabel: { fontSize: 11, fontWeight: 700, color: "var(--c-text-3)", letterSpacing: "0.08em", marginBottom: 8, marginTop: 4 },
-  section: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", marginBottom: 20 },
+  section: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--neu-raised-sm)", marginBottom: 20 },
   row: {
     display: "flex", alignItems: "center", gap: 14,
     padding: "14px 16px", background: "none",
@@ -156,10 +125,18 @@ const styles: Record<string, CSSProperties> = {
     background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
     transition: "transform 0.2s",
   },
+  version: { fontSize: 11, color: "var(--c-text-4)", textAlign: "center", marginTop: 16, marginBottom: 4 },
   logoutBtn: {
     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
     background: "var(--c-surface)", border: "none", borderRadius: 14,
     padding: "14px 20px", fontSize: 14, fontWeight: 600,
     color: "#ef4444", cursor: "pointer", width: "100%",
   },
+  logoutConfirm: {
+    display: "flex", alignItems: "center", gap: 10,
+    background: "var(--c-surface)", borderRadius: 14, padding: "12px 16px",
+  },
+  logoutConfirmText: { flex: 1, fontSize: 14, fontWeight: 600, color: "#ef4444" },
+  logoutConfirmYes:  { background: "#ef4444", border: "none", borderRadius: 10, padding: "8px 18px", fontSize: 14, fontWeight: 700, color: "#fff", cursor: "pointer" },
+  logoutConfirmNo:   { background: "var(--c-surface-2)", border: "none", borderRadius: 10, padding: "8px 18px", fontSize: 14, fontWeight: 600, color: "var(--c-text-2)", cursor: "pointer" },
 };

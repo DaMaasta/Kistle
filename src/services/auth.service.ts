@@ -1,49 +1,40 @@
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  GoogleAuthProvider,
-  signInWithPopup,
-  type User,
-} from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { api, setToken, clearToken } from '../config/api';
 
-const googleProvider = new GoogleAuthProvider();
-
-export async function registerUser(
-  email: string,
-  password: string,
-  displayName: string
-): Promise<User> {
-  const { user } = await createUserWithEmailAndPassword(auth, email, password);
-  await updateProfile(user, { displayName });
-  await setDoc(doc(db, 'users', user.uid), {
-    uid: user.uid,
-    email,
-    displayName,
-    createdAt: serverTimestamp(),
-  });
-  return user;
+export interface LoginResult {
+  token: string;
 }
 
-export async function loginUser(email: string, password: string): Promise<User> {
-  const { user } = await signInWithEmailAndPassword(auth, email, password);
-  return user;
+export async function registerUser(email: string, password: string, displayName: string): Promise<void> {
+  const { token } = await api.post<LoginResult>('/auth/register', { email, password, displayName });
+  setToken(token);
+  window.location.reload();
 }
 
-export async function loginWithGoogle(): Promise<User> {
-  const { user } = await signInWithPopup(auth, googleProvider);
-  await setDoc(doc(db, 'users', user.uid), {
-    uid: user.uid,
-    email: user.email ?? '',
-    displayName: user.displayName ?? '',
-    createdAt: serverTimestamp(),
-  }, { merge: true });
-  return user;
+export async function loginUser(email: string, password: string): Promise<void> {
+  const { token } = await api.post<LoginResult>('/auth/login', { email, password });
+  setToken(token);
+  window.location.reload();
+}
+
+export async function loginWithGoogle(idToken: string): Promise<void> {
+  const { token } = await api.post<LoginResult>('/auth/google', { idToken });
+  setToken(token);
+  window.location.reload();
 }
 
 export async function logoutUser(): Promise<void> {
-  await signOut(auth);
+  clearToken();
+  window.location.reload();
 }
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await api.post('/auth/change-password', { currentPassword, newPassword });
+}
+
+export async function deleteAccount(currentPassword: string): Promise<void> {
+  await api.delete('/auth/account', { password: currentPassword });
+  clearToken();
+  window.location.reload();
+}
+
+export async function handleOAuthRedirect(): Promise<void> {}

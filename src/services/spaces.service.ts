@@ -1,166 +1,254 @@
-import {
-  collection,
-  doc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  onSnapshot,
-  serverTimestamp,
-  arrayUnion,
-  type Unsubscribe,
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
-import type { Space, SpaceMember, UserRole } from '../types';
+import { api } from '../config/api';
+import type { Space } from '../types';
 
-type FirestoreData = Record<string, unknown>;
+// ── Cache (stale-while-revalidate, persisted to localStorage) ─────────────────
+const cache = new Map<string, Space[]>();
+const LS = 'kistle_sc2_';
 
-function toSpace(id: string, data: FirestoreData): Space {
-  return {
-    id,
-    name: data.name as string,
-    description: (data.description as string) || '',
-    type: (data.type as Space['type']) || 'room',
-    parentId: (data.parentId as string | null) ?? null,
-    ownerId: data.ownerId as string,
-    memberIds: (data.memberIds as string[]) || [],
-    members: (data.members as Record<string, SpaceMember>) || {},
-    icon: (data.icon as string) || '📦',
-    color: (data.color as string) || '#3b82f6',
-    isGroup: (data.isGroup as boolean) ?? false,
-    createdAt: (data.createdAt as { toDate(): Date } | null)?.toDate() ?? new Date(),
-    updatedAt: (data.updatedAt as { toDate(): Date } | null)?.toDate() ?? new Date(),
-  };
+function cacheGet(key: string): Space[] | null {
+  if (cache.has(key)) return cache.get(key)!;
+  try {
+    const raw = localStorage.getItem(LS + key);
+    if (!raw) return null;
+    const parsed = (JSON.parse(raw) as Space[]).map(deserializeSpace);
+    cache.set(key, parsed);
+    return parsed;
+  } catch { return null; }
 }
 
-export async function createSpace(
-  userId: string,
-  userEmail: string,
-  userDisplayName: string,
-  data: Partial<Omit<Space, 'id' | 'ownerId' | 'memberIds' | 'members' | 'createdAt' | 'updatedAt'>>
-): Promise<string> {
-  const member: SpaceMember = {
-    userId,
-    email: userEmail,
-    displayName: userDisplayName,
-    role: 'owner',
-  };
-  const ref = await addDoc(collection(db, 'spaces'), {
-    ...data,
-    ownerId: userId,
-    memberIds: [userId],
-    members: { [userId]: member },
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+function cacheSet(key: string, data: Space[]): void {
+  cache.set(key, data);
+  try { localStorage.setItem(LS + key, JSON.stringify(data)); } catch { /* quota */ }
+}
+
+// ── Optimistic state ──────────────────────────────────────────────────────────
+const pendingUpdates = new Map<string, Partial<Space>>();
+const pendingCreates = new Map<string, Space>();
+const pendingDeletes = new Set<string>();
+const activeLoaders  = new Set<() => void>();
+
+function triggerReload() {
+  activeLoaders.forEach(load => load());
+}
+
+function applyOptimistic(spaces: Space[]): Space[] {
+  const result = spaces
+    .filter(s => !pendingDeletes.has(s.id))
+    .map(s => {
+      const upd = pendingUpdates.get(s.id);
+      return upd ? { ...s, ...upd } : s;
+    });
+  pendingCreates.forEach(s => {
+    if (!result.find(r => r.id === s.id)) result.unshift(s);
   });
-  return ref.id;
+  return result;
 }
 
-export async function updateSpace(spaceId: string, data: Partial<Space>): Promise<void> {
-  await updateDoc(doc(db, 'spaces', spaceId), {
-    ...data,
-    updatedAt: serverTimestamp(),
-  });
+// ── Helpers ───────────────────────────────────────────────────────────────────
+export function generateAccessCode(length: number): string {
+  return Array.from({ length }, () => String(Math.floor(Math.random() * 10))).join('');
 }
 
-export async function deleteSpace(spaceId: string): Promise<void> {
-  await deleteDoc(doc(db, 'spaces', spaceId));
+function deserializeSpace(s: Space): Space {
+  return { ...s, createdAt: new Date(s.createdAt), updatedAt: new Date(s.updatedAt) };
 }
 
-export async function getSpaceContentCount(spaceId: string): Promise<{ boxes: number; products: number }> {
-  const [boxSnap, productSnap] = await Promise.all([
-    getDocs(query(collection(db, 'spaces'), where('parentId', '==', spaceId))),
-    getDocs(query(collection(db, 'products'), where('parentIds', 'array-contains', spaceId))),
-  ]);
-  return { boxes: boxSnap.size, products: productSnap.size };
-}
+const now = () => new Date();
 
-export async function getSpace(spaceId: string): Promise<Space | null> {
-  const snap = await getDoc(doc(db, 'spaces', spaceId));
-  if (!snap.exists()) return null;
-  return toSpace(snap.id, snap.data() as FirestoreData);
-}
-
+// ── Subscriptions ─────────────────────────────────────────────────────────────
 export function subscribeToUserSpaces(
-  userId: string,
+  _userId: string,
   callback: (spaces: Space[]) => void
-): Unsubscribe {
-  const q = query(
-    collection(db, 'spaces'),
-    where('memberIds', 'array-contains', userId)
-  );
-  return onSnapshot(q, (snapshot) => {
-    const spaces = snapshot.docs.map((d) => toSpace(d.id, d.data() as FirestoreData));
-    callback(spaces);
-  });
-}
-
-export function subscribeToAllSpaces(
-  callback: (spaces: Space[]) => void
-): Unsubscribe {
-  return onSnapshot(collection(db, 'spaces'), (snapshot) => {
-    callback(snapshot.docs.map((d) => toSpace(d.id, d.data() as FirestoreData)));
-  });
-}
-
-export function subscribeToChildSpaces(
-  parentId: string,
-  callback: (spaces: Space[]) => void
-): Unsubscribe {
-  const q = query(collection(db, 'spaces'), where('parentId', '==', parentId));
-  return onSnapshot(q, (snapshot) => {
-    const spaces = snapshot.docs.map((d) => toSpace(d.id, d.data() as FirestoreData));
-    callback(spaces.sort((a, b) => a.name.localeCompare(b.name)));
-  });
+): () => void {
+  let active = true;
+  const cacheKey = 'user';
+  const cached = cacheGet(cacheKey);
+  if (cached) callback(applyOptimistic(cached));
+  async function load() {
+    try {
+      const spaces = await api.get<Space[]>('/spaces');
+      const deserialized = spaces.map(deserializeSpace);
+      cacheSet(cacheKey, deserialized);
+      if (active) callback(applyOptimistic(deserialized));
+    } catch { /* ignore */ }
+  }
+  activeLoaders.add(load);
+  load();
+  const interval = setInterval(load, 6000);
+  return () => { active = false; clearInterval(interval); activeLoaders.delete(load); };
 }
 
 export function subscribeToSpace(
   spaceId: string,
   callback: (space: Space | null) => void
-): Unsubscribe {
-  return onSnapshot(doc(db, 'spaces', spaceId), (snap) => {
-    if (!snap.exists()) {
-      callback(null);
-      return;
+): () => void {
+  let active = true;
+  const cacheKey = `space:${spaceId}`;
+  const cachedArr = cacheGet(cacheKey);
+  if (cachedArr?.[0]) {
+    const upd = pendingUpdates.get(spaceId);
+    callback(upd ? { ...cachedArr[0], ...upd } : cachedArr[0]);
+  }
+  async function load() {
+    const space = await getSpace(spaceId);
+    if (active) {
+      if (!space) { callback(null); return; }
+      cacheSet(cacheKey, [space]);
+      const upd = pendingUpdates.get(spaceId);
+      callback(upd ? { ...space, ...upd } : space);
     }
-    callback(toSpace(snap.id, snap.data() as FirestoreData));
-  });
+  }
+  activeLoaders.add(load);
+  load();
+  const interval = setInterval(load, 6000);
+  return () => { active = false; clearInterval(interval); activeLoaders.delete(load); };
 }
 
-export async function addMember(
-  spaceId: string,
-  targetEmail: string,
-  role: UserRole
-): Promise<void> {
-  const q = query(collection(db, 'users'), where('email', '==', targetEmail));
-  const snap = await getDocs(q);
-  if (snap.empty) throw new Error('Benutzer nicht gefunden. Die Person muss zuerst ein Konto erstellen.');
-  const userData = snap.docs[0].data() as { uid: string; email: string; displayName: string };
-  const member: SpaceMember = {
-    userId: userData.uid,
-    email: userData.email,
-    displayName: userData.displayName,
-    role,
+export function subscribeToChildSpaces(
+  parentId: string,
+  callback: (spaces: Space[]) => void
+): () => void {
+  let active = true;
+  const cacheKey = `children:${parentId}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) callback(applyOptimistic(cached));
+  async function load() {
+    try {
+      const spaces = await api.get<Space[]>(`/spaces?parentId=${parentId}`);
+      const deserialized = spaces.map(deserializeSpace);
+      cacheSet(cacheKey, deserialized);
+      if (active) callback(applyOptimistic(deserialized));
+    } catch { /* ignore */ }
+  }
+  activeLoaders.add(load);
+  load();
+  const interval = setInterval(load, 6000);
+  return () => { active = false; clearInterval(interval); activeLoaders.delete(load); };
+}
+
+export function subscribeToSpacesByParentIds(
+  parentIds: string[],
+  callback: (spaces: Space[]) => void
+): () => void {
+  let active = true;
+  const cacheKey = `parents:${parentIds.sort().join(',')}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) callback(applyOptimistic(cached));
+  async function load() {
+    try {
+      const all = await Promise.all(parentIds.map(id => api.get<Space[]>(`/spaces?parentId=${id}`)));
+      const deserialized = all.flat().map(deserializeSpace);
+      cacheSet(cacheKey, deserialized);
+      if (active) callback(applyOptimistic(deserialized));
+    } catch { /* ignore */ }
+  }
+  activeLoaders.add(load);
+  load();
+  const interval = setInterval(load, 6000);
+  return () => { active = false; clearInterval(interval); activeLoaders.delete(load); };
+}
+
+// ── Mutations ─────────────────────────────────────────────────────────────────
+export async function createSpace(
+  _userId: string,
+  _userEmail: string,
+  _userDisplayName: string,
+  data: Partial<Omit<Space, 'id' | 'ownerId' | 'memberIds' | 'members' | 'createdAt' | 'updatedAt'>>
+): Promise<string> {
+  const id = crypto.randomUUID();
+  const optimistic: Space = {
+    id, ownerId: '', memberIds: [], members: {},
+    createdAt: now(), updatedAt: now(),
+    name: '', type: 'other', description: '', icon: '📦',
+    color: '#f97316', isGroup: false, parentId: null,
+    ...data,
   };
-  await updateDoc(doc(db, 'spaces', spaceId), {
-    [`members.${userData.uid}`]: member,
-    memberIds: arrayUnion(userData.uid),
-    updatedAt: serverTimestamp(),
-  });
+  pendingCreates.set(id, optimistic);
+  triggerReload();
+  try {
+    await api.post('/spaces', { id, ...data });
+    return id;
+  } catch (err) {
+    pendingCreates.delete(id);
+    triggerReload();
+    throw err;
+  } finally {
+    pendingCreates.delete(id);
+  }
+}
+
+export async function updateSpace(spaceId: string, data: Partial<Space>): Promise<void> {
+  const previous = pendingUpdates.get(spaceId);
+  pendingUpdates.set(spaceId, { ...previous, ...data });
+  triggerReload();
+  try {
+    await api.put(`/spaces/${spaceId}`, data);
+  } catch (err) {
+    pendingUpdates.delete(spaceId);
+    triggerReload();
+    throw err;
+  } finally {
+    pendingUpdates.delete(spaceId);
+  }
+}
+
+export async function deleteSpace(spaceId: string): Promise<void> {
+  pendingDeletes.add(spaceId);
+  triggerReload();
+  try {
+    await api.delete(`/spaces/${spaceId}`);
+  } catch (err) {
+    pendingDeletes.delete(spaceId);
+    triggerReload();
+    throw err;
+  }
+}
+
+export async function getSpace(spaceId: string): Promise<Space | null> {
+  try {
+    const space = await api.get<Space>(`/spaces/${spaceId}`);
+    return deserializeSpace(space);
+  } catch {
+    return null;
+  }
+}
+
+export async function getSpaceContentCount(
+  spaceId: string
+): Promise<{ boxes: number; products: number }> {
+  return api.get(`/spaces/${spaceId}/content-count`);
+}
+
+export async function joinGroup(
+  spaceId: string,
+  _userId: string,
+  _userEmail: string,
+  _userDisplayName: string
+): Promise<void> {
+  await api.post(`/spaces/${spaceId}/join`, {});
+}
+
+export async function regenerateAccessCode(spaceId: string, length: number): Promise<void> {
+  await api.post(`/spaces/${spaceId}/access-code`, { length });
+}
+
+export async function ensureAccessCode(spaceId: string): Promise<void> {
+  const space = await getSpace(spaceId);
+  if (!space?.accessCode) await api.post(`/spaces/${spaceId}/access-code`, { length: 4 });
+}
+
+export async function removeAccessCode(spaceId: string): Promise<void> {
+  await api.delete(`/spaces/${spaceId}/access-code`);
+}
+
+export async function addMember(spaceId: string, userId: string, displayName: string, email: string, role: string): Promise<void> {
+  await api.post(`/spaces/${spaceId}/members`, { userId, displayName, email, role });
+}
+
+export async function updateMemberRole(spaceId: string, userId: string, role: string): Promise<void> {
+  await api.put(`/spaces/${spaceId}/members/${userId}`, { role });
 }
 
 export async function removeMember(spaceId: string, userId: string): Promise<void> {
-  const space = await getSpace(spaceId);
-  if (!space) return;
-  const newMemberIds = space.memberIds.filter((id) => id !== userId);
-  const newMembers = { ...space.members };
-  delete newMembers[userId];
-  await updateDoc(doc(db, 'spaces', spaceId), {
-    memberIds: newMemberIds,
-    members: newMembers,
-    updatedAt: serverTimestamp(),
-  });
+  await api.delete(`/spaces/${spaceId}/members/${userId}`);
 }

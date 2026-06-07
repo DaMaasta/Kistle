@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(firebase deploy *)",
+      "Bash(npm run deploy)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "S=/tmp/kistle-last-deploy; cd /Users/danielengel/React/App/Kistle && ([ ! -f $S ] || find src -name '*.tsx' -newer $S -o -name '*.ts' -newer $S -o -name '*.css' -newer $S | grep -q .) && (npm run deploy; touch $S) >> /tmp/kistle-deploy.log 2>&1",
+            "async": true,
+            "statusMessage": "Deploying changes..."
+          }
+        ]
+      }
+    ]
+  }
+}

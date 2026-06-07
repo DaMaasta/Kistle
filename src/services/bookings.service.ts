@@ -1,85 +1,66 @@
-import {
-  collection,
-  addDoc,
-  query,
-  where,
-  onSnapshot,
-  serverTimestamp,
-  type Unsubscribe,
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { api } from '../config/api';
 import type { Booking, BookingItem, CartItem } from '../types';
-import { updateQuantity } from './products.service';
 
-type FirestoreData = Record<string, unknown>;
-
-function toBooking(id: string, data: FirestoreData): Booking {
-  return {
-    id,
-    userId: data.userId as string,
-    userDisplayName: (data.userDisplayName as string) || '',
-    userEmail: (data.userEmail as string) || '',
-    createdAt: (data.createdAt as { toDate(): Date } | null)?.toDate() ?? new Date(),
-    parentIds: (data.parentIds as string[]) || [],
-    items: (data.items as BookingItem[]) || [],
-  };
+function deserializeBooking(b: Booking): Booking {
+  return { ...b, createdAt: new Date(b.createdAt) };
 }
 
 export async function createBooking(
-  userId: string,
-  userDisplayName: string,
-  userEmail: string,
+  _userId: string,
+  _userDisplayName: string,
+  _userEmail: string,
   cartItems: CartItem[]
-): Promise<void> {
-  const items: BookingItem[] = cartItems.map((ci) => ({
-    productId: ci.productId,
-    productName: ci.productName,
-    quantity: ci.cartQuantity,
-    unit: ci.unit,
-    imageUrl: null,
-    boxId: ci.boxId,
-    boxName: ci.boxName,
-    parentId: ci.parentId,
-    parentName: ci.parentName,
+): Promise<string> {
+  const id = crypto.randomUUID();
+  const items: BookingItem[] = cartItems.map(i => ({
+    productId:   i.productId,
+    productName: i.productName,
+    quantity:    i.cartQuantity,
+    unit:        i.unit,
+    imageUrl:    i.imageUrl,
+    boxId:       i.boxId,
+    boxName:     i.boxName,
+    parentId:    i.parentId,
+    parentName:  i.parentName,
   }));
+  const parentIds = [...new Set(items.map(i => i.parentId).filter(Boolean))];
+  const { id: returnedId } = await api.post<{ id: string }>('/bookings', { id, items, parentIds });
+  return returnedId;
+}
 
-  const parentIds = [...new Set(cartItems.map((ci) => ci.parentId).filter(Boolean) as string[])];
-
-  // Mengen in den Boxen verringern
-  await Promise.all(
-    cartItems.map((ci) =>
-      updateQuantity(
-        ci.productId,
-        userId,
-        userEmail,
-        Math.max(0, ci.maxQuantity - ci.cartQuantity)
-      )
-    )
-  );
-
-  // Abbuchung speichern
-  await addDoc(collection(db, 'bookings'), {
-    userId,
-    userDisplayName,
-    userEmail,
-    parentIds,
-    items,
-    createdAt: serverTimestamp(),
-  });
+export async function returnBooking(bookingId: string): Promise<string> {
+  const { id } = await api.post<{ id: string }>(`/bookings/${bookingId}/return`, {});
+  return id;
 }
 
 export function subscribeToGroupBookings(
   groupId: string,
   callback: (bookings: Booking[]) => void
-): Unsubscribe {
-  const q = query(
-    collection(db, 'bookings'),
-    where('parentIds', 'array-contains', groupId)
-  );
-  return onSnapshot(q, (snap) => {
-    const bookings = snap.docs
-      .map((d) => toBooking(d.id, d.data() as FirestoreData))
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    callback(bookings);
-  });
+): () => void {
+  let active = true;
+  async function load() {
+    try {
+      const bookings = await api.get<Booking[]>(`/bookings?groupId=${groupId}`);
+      if (active) callback(bookings.map(deserializeBooking));
+    } catch { /* ignore */ }
+  }
+  load();
+  const interval = setInterval(load, 8000);
+  return () => { active = false; clearInterval(interval); };
+}
+
+export async function getBooking(bookingId: string): Promise<Booking | null> {
+  try {
+    const booking = await api.get<Booking>(`/bookings/${bookingId}`);
+    return deserializeBooking(booking);
+  } catch {
+    return null;
+  }
+}
+
+export async function createReturnBooking(
+  originalBookingId: string,
+  items: Array<{ productId: string; quantity: number }>
+): Promise<void> {
+  await api.post(`/bookings/${originalBookingId}/return`, { items });
 }

@@ -1,5 +1,6 @@
-import React, { useState, CSSProperties } from "react";
-import { Package, AlertTriangle, X } from "lucide-react";
+import React, { useState } from "react";
+import type { CSSProperties } from "react";
+import { useGoogleLogin } from "@react-oauth/google";
 import { loginUser, registerUser, loginWithGoogle } from "../services/auth.service";
 
 type Mode = "login" | "register";
@@ -12,7 +13,6 @@ export default function LoginPage(): React.ReactElement {
   const [error, setError]               = useState("");
   const [loading, setLoading]           = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [showSetupHint, setShowSetupHint] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,14 +29,16 @@ export default function LoginPage(): React.ReactElement {
       const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
       if (msg.includes("popup-closed-by-user") || msg.includes("cancelled-popup-request")) {
         // user closed popup — no error needed
-      } else if (msg.includes("configuration-not-found") || msg.includes("auth/configuration-not-found")) {
-        setShowSetupHint(true);
       } else if (msg.includes("invalid-credential") || msg.includes("wrong-password") || msg.includes("user-not-found")) {
         setError("E-Mail oder Passwort falsch.");
       } else if (msg.includes("email-already-in-use")) {
         setError("Diese E-Mail-Adresse ist bereits registriert.");
       } else if (msg.includes("weak-password")) {
         setError("Passwort muss mindestens 6 Zeichen haben.");
+      } else if (msg.includes("network-request-failed") || msg.includes("network")) {
+        setError("Keine Internetverbindung. Bitte prüfe deine Verbindung.");
+      } else if (msg.includes("too-many-requests")) {
+        setError("Zu viele Versuche. Bitte warte kurz und versuche es erneut.");
       } else {
         setError(msg);
       }
@@ -44,56 +46,38 @@ export default function LoginPage(): React.ReactElement {
     }
   };
 
-  const handleGoogle = async () => {
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true);
+      try {
+        // tokenResponse.access_token → wir tauschen ihn gegen Nutzer-Info und senden ihn ans Backend
+        // Das Backend erwartet ein ID-Token — wir nutzen den access_token um userinfo abzufragen
+        await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        
+        // Wir senden den access_token als "idToken" — Backend muss entsprechend tokeninfo endpoint nutzen
+        await loginWithGoogle(tokenResponse.access_token);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Google-Anmeldung fehlgeschlagen");
+      } finally {
+        setGoogleLoading(false);
+      }
+    },
+    onError: () => setError("Google-Anmeldung fehlgeschlagen"),
+  });
+
+  const handleGoogle = () => {
     setError("");
-    setGoogleLoading(true);
-    try {
-      await loginWithGoogle();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("popup-closed-by-user") || msg.includes("cancelled-popup-request")) return;
-      if (msg.includes("configuration-not-found")) { setShowSetupHint(true); return; }
-      setError("Google-Anmeldung fehlgeschlagen.");
-    } finally {
-      setGoogleLoading(false);
-    }
+    googleLogin();
   };
 
   return (
     <div style={styles.root}>
 
-      {/* Setup-Hinweis Modal */}
-      {showSetupHint && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
-            <div style={styles.modalHeader}>
-              <AlertTriangle size={22} color="#f59e0b" />
-              <span style={styles.modalTitle}>Firebase Authentication nicht aktiviert</span>
-              <button style={styles.modalClose} onClick={() => setShowSetupHint(false)}>
-                <X size={18} color="#94a3b8" />
-              </button>
-            </div>
-            <p style={styles.modalText}>
-              Die Anmeldung ist noch nicht eingerichtet. Aktiviere <strong>Email/Passwort</strong> in der Firebase Console:
-            </p>
-            <ol style={styles.modalSteps}>
-              <li>Öffne <strong>console.firebase.google.com</strong></li>
-              <li>Wähle dein Projekt <strong>lagerapp-61b48</strong></li>
-              <li>Gehe zu <strong>Authentication → Sign-in method</strong></li>
-              <li>Aktiviere <strong>E-Mail/Passwort</strong></li>
-              <li>Speichern – dann hier erneut versuchen</li>
-            </ol>
-            <button style={styles.modalBtn} onClick={() => { setShowSetupHint(false); setMode("register"); }}>
-              Zur Registrierung
-            </button>
-          </div>
-        </div>
-      )}
-
       <div style={styles.card}>
         <div style={styles.logoRow}>
-          <div style={styles.logoIcon}><Package size={22} color="#fff" /></div>
-          <span style={styles.logoText}>Kistle</span>
+          <img src="/logo-v3.svg" alt="Kistle" style={styles.logoIcon} />
         </div>
 
         <h1 style={styles.title}>{mode === "login" ? "Willkommen zurück" : "Konto erstellen"}</h1>
@@ -122,6 +106,8 @@ export default function LoginPage(): React.ReactElement {
                 placeholder="Dein Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+                inputMode="text"
                 required
               />
             </div>
@@ -134,6 +120,8 @@ export default function LoginPage(): React.ReactElement {
               placeholder="name@beispiel.de"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              inputMode="email"
               required
             />
           </div>
@@ -145,8 +133,12 @@ export default function LoginPage(): React.ReactElement {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
               required
             />
+            {mode === "register" && (
+              <span style={styles.fieldHint}>Mindestens 6 Zeichen</span>
+            )}
           </div>
 
           {error && <div style={styles.error}>{error}</div>}
@@ -174,62 +166,49 @@ export default function LoginPage(): React.ReactElement {
 
 const styles: Record<string, CSSProperties> = {
   root: {
-    minHeight: "100vh",
+    minHeight: "100svh",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#f8fafc",
+    background: "var(--c-bg)",
     padding: 16,
   },
   card: {
-    background: "#fff",
+    background: "var(--c-surface)",
     borderRadius: 24,
     padding: "32px 28px",
     width: "100%",
     maxWidth: 400,
-    boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+    boxShadow: "var(--neu-raised-lg)",
   },
-  logoRow: { display: "flex", alignItems: "center", gap: 10, marginBottom: 28 },
-  logoIcon: {
-    width: 38, height: 38,
-    background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
-    borderRadius: 11,
-    display: "flex", alignItems: "center", justifyContent: "center",
-  },
-  logoText: { fontSize: 18, fontWeight: 700, color: "#0f172a" },
-  title: { fontSize: 22, fontWeight: 800, color: "#0f172a", margin: "0 0 6px" },
-  subtitle: { fontSize: 14, color: "#94a3b8", margin: "0 0 24px" },
+  logoRow: { display: "flex", justifyContent: "center", marginBottom: 28 },
+  logoIcon: { width: 52, height: 52, borderRadius: 15, display: "block" },
+  title: { fontSize: 22, fontWeight: 800, color: "var(--c-text-1)", margin: "0 0 6px" },
+  subtitle: { fontSize: 14, color: "var(--c-text-3)", margin: "0 0 14px" },
   form: { display: "flex", flexDirection: "column", gap: 16 },
   field: { display: "flex", flexDirection: "column", gap: 6 },
-  label: { fontSize: 13, fontWeight: 600, color: "#475569" },
+  label: { fontSize: 13, fontWeight: 600, color: "var(--c-text-2)" },
   input: {
-    border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px",
-    fontSize: 14, color: "#0f172a", outline: "none",
-    transition: "border-color 0.15s",
+    border: "none", borderRadius: 12, padding: "12px 14px",
+    fontSize: 16, color: "var(--c-text-1)", outline: "none",
+    background: "var(--c-bg)", boxShadow: "var(--neu-inset-sm)",
   },
   error: {
-    background: "#fef2f2", border: "1px solid #fecaca",
-    borderRadius: 10, padding: "10px 14px",
-    fontSize: 13, color: "#dc2626",
+    background: "var(--c-bg)", borderRadius: 10, padding: "10px 14px",
+    fontSize: 13, color: "#dc2626", wordBreak: "break-word",
+    boxShadow: "var(--neu-inset-sm)",
   },
   submitBtn: {
     background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
     color: "#fff", border: "none", borderRadius: 12,
-    padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer",
+    padding: "14px 0", fontSize: 16, fontWeight: 700, cursor: "pointer",
     marginTop: 4,
   },
+  fieldHint: { fontSize: 11, color: "var(--c-text-3)", marginTop: 2 },
   switchRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 20 },
-  switchText: { fontSize: 13, color: "#94a3b8" },
+  switchText: { fontSize: 13, color: "var(--c-text-3)" },
   switchBtn: { background: "none", border: "none", color: "#f97316", fontSize: 13, fontWeight: 700, cursor: "pointer" },
-  googleBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "12px 0", fontSize: 14, fontWeight: 600, color: "#0f172a", cursor: "pointer", width: "100%", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" },
-  divider: { display: "flex", alignItems: "center", gap: 0, margin: "4px 0", borderTop: "1px solid #e2e8f0" },
-  dividerText: { fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" as const, background: "#fff", padding: "0 8px" },
-  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
-  modalCard: { background: "#fff", borderRadius: 20, padding: "24px", width: "100%", maxWidth: 380, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", display: "flex", flexDirection: "column", gap: 14 },
-  modalHeader: { display: "flex", alignItems: "center", gap: 10 },
-  modalTitle: { flex: 1, fontSize: 15, fontWeight: 700, color: "#0f172a" },
-  modalClose: { background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" },
-  modalText: { fontSize: 13, color: "#475569", lineHeight: 1.5, margin: 0 },
-  modalSteps: { fontSize: 13, color: "#475569", lineHeight: 2, margin: 0, paddingLeft: 18 },
-  modalBtn: { background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)", color: "#fff", border: "none", borderRadius: 12, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", marginTop: 4 },
+  googleBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--c-bg)", border: "none", borderRadius: 12, padding: "12px 0", fontSize: 14, fontWeight: 600, color: "var(--c-text-1)", cursor: "pointer", width: "100%", boxShadow: "var(--neu-raised-sm)" },
+  divider: { display: "flex", alignItems: "center", justifyContent: "center", margin: "14px 0" },
+  dividerText: { fontSize: 12, color: "var(--c-text-3)", whiteSpace: "nowrap" as const },
 };

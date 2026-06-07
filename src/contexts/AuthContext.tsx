@@ -1,29 +1,43 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { type User, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { api, setToken, clearToken, isLoggedIn } from '../config/api';
 
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
+export interface AppUser {
+  id: string;
+  uid: string;         // Alias für id — Rückwärtskompatibilität mit bestehenden Komponenten
+  userId: string;
+  email: string;
+  displayName: string;
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
+interface AuthContextType {
+  user: AppUser | null;
+  loading: boolean;
+  refreshUser: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType>({ user: null, loading: true, refreshUser: async () => {} });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser]       = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
+  async function loadUser() {
+    if (!isLoggedIn()) { setLoading(false); return; }
+    try {
+      const data = await api.get<{ userId: string; email: string; displayName: string }>('/auth/me');
+      setUser({ id: data.userId, uid: data.userId, userId: data.userId, email: data.email, displayName: data.displayName });
+    } catch {
+      clearToken();
+    } finally {
       setLoading(false);
-    });
-    return unsubscribe;
-  }, []);
+    }
+  }
+
+  useEffect(() => { loadUser(); }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, refreshUser: loadUser }}>
       {children}
     </AuthContext.Provider>
   );
@@ -32,3 +46,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+
+// Intern genutzt von auth.service.ts
+export function _setAuthUser(_user: AppUser | null) {
+  // Dieser Export wird nur von auth.service verwendet
+}
+
+export { setToken };
