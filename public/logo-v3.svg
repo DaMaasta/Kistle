@@ -1,24 +1,22 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="110" fill="#e0e5ec"/>
-
   <!-- Pixel-art K — 4 cols × 5 rows, pixel=52px gap=8px step=60px, offset=(140,110) -->
   <!-- Stem: col0, rows 0-4 (5 squares)                                -->
   <!-- Upper arm (3): junction(col1,row2) → (col2,row1) → (col3,row0) -->
   <!-- Lower arm (2): junction(col1,row2) shared → (col2,row3)         -->
 
   <!-- Stem -->
-  <rect x="140" y="110" width="52" height="52" fill="#f97316"/>
-  <rect x="140" y="170" width="52" height="52" fill="#f97316"/>
-  <rect x="140" y="230" width="52" height="52" fill="#f97316"/>
-  <rect x="140" y="290" width="52" height="52" fill="#f97316"/>
-  <rect x="140" y="350" width="52" height="52" fill="#f97316"/>
+  <rect x="140" y="110" width="52" height="52" fill="#FF7648"/>
+  <rect x="140" y="170" width="52" height="52" fill="#FF7648"/>
+  <rect x="140" y="230" width="52" height="52" fill="#FF7648"/>
+  <rect x="140" y="290" width="52" height="52" fill="#FF7648"/>
+  <rect x="140" y="350" width="52" height="52" fill="#FF7648"/>
 
   <!-- Upper arm (3 squares going up-right, includes junction) -->
-  <rect x="200" y="230" width="52" height="52" fill="#f97316"/>
-  <rect x="260" y="170" width="52" height="52" fill="#f97316"/>
-  <rect x="320" y="110" width="52" height="52" fill="#f97316"/>
+  <rect x="200" y="230" width="52" height="52" fill="#FF7648"/>
+  <rect x="260" y="170" width="52" height="52" fill="#FF7648"/>
+  <rect x="320" y="110" width="52" height="52" fill="#FF7648"/>
 
   <!-- Lower arm (2 more squares — junction already drawn above) -->
-  <rect x="260" y="290" width="52" height="52" fill="#f97316"/>
-  <rect x="320" y="350" width="52" height="52" fill="#f97316"/>
+  <rect x="260" y="290" width="52" height="52" fill="#FF7648"/>
+  <rect x="320" y="350" width="52" height="52" fill="#FF7648"/>
 </svg>

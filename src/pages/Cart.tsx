@@ -131,7 +131,7 @@ export default function Cart({ navigate: _navigate }: CartProps): React.ReactEle
                 ? "linear-gradient(135deg, #16a34a 0%, #15803d 100%)"
                 : armed
                 ? "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)"
-                : "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+                : "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
               transition: "background 0.25s",
             }}
             onClick={handleButtonClick}
@@ -173,9 +173,9 @@ const styles: Record<string, CSSProperties> = {
   errorBox: { display: "flex", alignItems: "center", gap: 8, background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#991b1b", marginBottom: 10 },
   abbuchenBtn: {
     width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-    background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
     color: "#fff", border: "none", borderRadius: 14,
     padding: "15px", fontSize: 16, fontWeight: 700,
-    cursor: "pointer", boxShadow: "0 4px 14px rgba(249,115,22,0.35)",
+    cursor: "pointer", boxShadow: "0 4px 14px rgba(255,118,72,0.35)",
   },
 };

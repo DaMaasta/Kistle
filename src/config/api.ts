@@ -52,10 +52,20 @@ async function request<T>(
   return data as T;
 }
 
+async function fetchBlob(path: string): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${BASE_URL}${path}`, { headers });
+  if (!res.ok) throw new ApiError(res.status, `HTTP ${res.status}`);
+  return res.blob();
+}
+
 export const api = {
   get:    <T>(path: string)                       => request<T>('GET', path),
   post:   <T>(path: string, body: unknown)        => request<T>('POST', path, body),
   put:    <T>(path: string, body: unknown)        => request<T>('PUT', path, body),
   delete: <T>(path: string, body?: unknown)       => request<T>('DELETE', path, body),
   upload: <T>(path: string, formData: FormData)   => request<T>('POST', path, undefined, formData),
+  blob:   (path: string)                          => fetchBlob(path),
 };

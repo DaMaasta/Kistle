@@ -96,7 +96,7 @@ export default function QuantityModal({ product, initialQty, onConfirm, onClose 
         </div>
 
         <button
-          style={{ ...styles.confirmBtn, background: confirmed ? "#16a34a" : "linear-gradient(135deg, #f97316 0%, #ea580c 100%)", boxShadow: confirmed ? "0 4px 14px rgba(22,163,74,0.35)" : "0 4px 14px rgba(249,115,22,0.35)", transition: "background 0.2s, box-shadow 0.2s" }}
+          style={{ ...styles.confirmBtn, background: confirmed ? "#16a34a" : "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)", boxShadow: confirmed ? "0 4px 14px rgba(22,163,74,0.35)" : "0 4px 14px rgba(255,118,72,0.35)", transition: "background 0.2s, box-shadow 0.2s" }}
           onClick={() => !confirmed && handleConfirm(qty)}
         >
           <ShoppingCart size={18} color="#fff" />
@@ -140,9 +140,9 @@ const styles: Record<string, CSSProperties> = {
   qtyVal: { fontSize: 42, fontWeight: 800, color: "var(--c-text-1)", minWidth: 64, width: 80, textAlign: "center", border: "none", outline: "none", background: "transparent", padding: 0, fontFamily: "inherit" },
   confirmBtn: {
     display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-    background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
     color: "#fff", border: "none", borderRadius: 16,
     padding: "16px", fontSize: 16, fontWeight: 700, cursor: "pointer",
-    boxShadow: "0 4px 14px rgba(249,115,22,0.35)",
+    boxShadow: "0 4px 14px rgba(255,118,72,0.35)",
   },
 };

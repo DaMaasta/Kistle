@@ -24,12 +24,62 @@ export interface FolderContents {
   files: DocFile[];
 }
 
-function deserializeFolder(f: DocFolder): DocFolder {
-  return { ...f, createdAt: new Date(f.createdAt) };
+// ── Cache (stale-while-revalidate, persisted to localStorage) ─────────────────
+const cache = new Map<string, FolderContents>();
+const LS = 'kistle_doc2_';
+
+type RawFolder = Record<string, unknown>;
+type RawFile = Record<string, unknown>;
+
+function deserializeFolder(f: RawFolder): DocFolder {
+  return {
+    id: f.id as string,
+    name: f.name as string,
+    parentId: (f.parentId ?? f.parent_id ?? null) as string | null,
+    ownerId: (f.ownerId ?? f.owner_id ?? '') as string,
+    createdAt: new Date((f.createdAt ?? f.created_at) as string),
+  };
 }
 
-function deserializeFile(f: DocFile): DocFile {
-  return { ...f, createdAt: new Date(f.createdAt) };
+function deserializeFile(f: RawFile): DocFile {
+  const filePath = (f.filePath ?? f.file_path ?? '') as string;
+  return {
+    id: f.id as string,
+    name: f.name as string,
+    parentId: (f.parentId ?? f.folder_id ?? null) as string | null,
+    ownerId: (f.ownerId ?? f.owner_id ?? '') as string,
+    url: ((f.url as string) || null) ?? (filePath ? `https://kistle.uk/api/documents/serve/${filePath.split('/').pop()}` : ''),
+    mimeType: (f.mimeType ?? f.mime_type ?? '') as string,
+    size: (f.size ?? 0) as number,
+    createdAt: new Date((f.createdAt ?? f.created_at) as string),
+  };
+}
+
+function deserializeContents(raw: FolderContents): FolderContents {
+  return {
+    folders: (raw.folders as unknown as RawFolder[]).map(deserializeFolder),
+    files: (raw.files as unknown as RawFile[]).map(deserializeFile),
+  };
+}
+
+function cacheKey(parentId: string | null): string {
+  return `folder:${parentId ?? 'root'}`;
+}
+
+function cacheGet(key: string): FolderContents | null {
+  if (cache.has(key)) return cache.get(key)!;
+  try {
+    const raw = localStorage.getItem(LS + key);
+    if (!raw) return null;
+    const parsed = deserializeContents(JSON.parse(raw) as FolderContents);
+    cache.set(key, parsed);
+    return parsed;
+  } catch { return null; }
+}
+
+function cacheSet(key: string, data: FolderContents): void {
+  cache.set(key, data);
+  try { localStorage.setItem(LS + key, JSON.stringify(data)); } catch { /* quota */ }
 }
 
 export function subscribeToFolderContents(
@@ -38,15 +88,23 @@ export function subscribeToFolderContents(
   callback: (contents: FolderContents) => void
 ): () => void {
   let active = true;
+  const key = cacheKey(parentId);
+  const cached = cacheGet(key);
+  if (cached) callback(cached);
+
   async function load() {
-    const [folders, files] = await Promise.all([
-      api.get<DocFolder[]>(`/documents/folders?parentId=${parentId ?? ''}`),
-      api.get<DocFile[]>(`/documents?folderId=${parentId ?? ''}`),
-    ]);
-    if (active) callback({
-      folders: folders.map(deserializeFolder).sort((a, b) => a.name.localeCompare(b.name, 'de')),
-      files: files.map(deserializeFile).sort((a, b) => a.name.localeCompare(b.name, 'de')),
-    });
+    try {
+      const [folders, files] = await Promise.all([
+        api.get<RawFolder[]>(`/documents/folders?parentId=${parentId ?? ''}`),
+        api.get<RawFile[]>(`/documents?folderId=${parentId ?? ''}`),
+      ]);
+      const contents: FolderContents = {
+        folders: folders.map(deserializeFolder).sort((a, b) => a.name.localeCompare(b.name, 'de')),
+        files: files.map(deserializeFile).sort((a, b) => a.name.localeCompare(b.name, 'de')),
+      };
+      cacheSet(key, contents);
+      if (active) callback(contents);
+    } catch { /* ignore */ }
   }
   load();
   const interval = setInterval(load, 8000);

@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { CSSProperties } from "react";
-import { ChevronLeft, ChevronRight, Bell, Moon, Lock } from "lucide-react";
+import { ChevronRight, Bell, Moon, Lock } from "lucide-react";
 import type { NavigateFn } from "../App";
 import { useTheme } from "../contexts/ThemeContext";
+import { useHeader } from "../contexts/HeaderContext";
 import { isNotificationSupported, requestNotificationPermission, getNotificationsEnabled, setNotificationsEnabled } from "../services/notifications.service";
 
 interface RowProps {
@@ -21,13 +22,13 @@ function Row({ icon: Icon, label, value, toggle, onToggle, onClick, last }: RowP
       style={{ ...styles.row, borderBottom: last ? "none" : "1px solid var(--c-border-2)" }}
       onClick={onClick ?? onToggle}
     >
-      <div style={styles.rowIcon}><Icon size={17} color="#f97316" /></div>
+      <div style={styles.rowIcon}><Icon size={17} color="#FF7648" /></div>
       <div style={styles.rowContent}>
         <span style={styles.rowLabel}>{label}</span>
         {value !== undefined && <span style={styles.rowValue}>{value}</span>}
       </div>
       {toggle !== undefined ? (
-        <div style={{ ...styles.toggle, background: toggle ? "#f97316" : "var(--c-surface-2)" }}>
+        <div style={{ ...styles.toggle, background: toggle ? "#FF7648" : "var(--c-surface-2)" }}>
           <div style={{ ...styles.toggleThumb, transform: toggle ? "translateX(18px)" : "translateX(0)" }} />
         </div>
       ) : (
@@ -39,6 +40,12 @@ function Row({ icon: Icon, label, value, toggle, onToggle, onClick, last }: RowP
 
 export default function Erweiterungen({ navigate }: { navigate: NavigateFn }): React.ReactElement {
   const { isDark, toggle } = useTheme();
+  const { setHeader, clearHeader } = useHeader();
+
+  useEffect(() => {
+    setHeader({ title: "Erweiterungen", onBack: () => navigate("Settings") });
+    return () => clearHeader();
+  }, []);
 
   const [notifEnabled, setNotifEnabled] = useState(() =>
     isNotificationSupported() && Notification.permission === "granted" && getNotificationsEnabled()
@@ -64,11 +71,6 @@ export default function Erweiterungen({ navigate }: { navigate: NavigateFn }): R
 
   return (
     <div style={styles.container}>
-      <button style={styles.back} onClick={() => navigate("Settings")}>
-        <ChevronLeft size={20} color="#f97316" />
-        <span style={styles.backLabel}>Einstellungen</span>
-      </button>
-
       <h1 style={styles.title}>Erweiterungen</h1>
       <p style={styles.subtitle}>App-Einstellungen & Integrationen</p>
 
@@ -109,8 +111,8 @@ export default function Erweiterungen({ navigate }: { navigate: NavigateFn }): R
 
 const styles: Record<string, CSSProperties> = {
   container:   { padding: "16px 16px", height: "100%", overflowY: "auto" as const },
-  back:        { display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: "0 0 16px", color: "#f97316" },
-  backLabel:   { fontSize: 15, fontWeight: 600, color: "#f97316" },
+  back:        { display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: "0 0 16px", color: "#FF7648" },
+  backLabel:   { fontSize: 15, fontWeight: 600, color: "#FF7648" },
   title:       { fontSize: 28, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
   subtitle:    { fontSize: 14, color: "var(--c-text-3)", marginTop: 4, marginBottom: 24 },
   sectionLabel:{ fontSize: 11, fontWeight: 700, color: "var(--c-text-3)", letterSpacing: "0.08em", marginBottom: 8 },

@@ -4,8 +4,8 @@
   "description": "Inventar verwalten",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f97316",
-  "theme_color": "#f97316",
+  "background_color": "#ffffff",
+  "theme_color": "transparent",
   "icons": [
     {
       "src": "/icon-192-v2.png",

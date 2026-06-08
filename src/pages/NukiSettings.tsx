@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { CSSProperties } from "react";
-import { ChevronLeft, LockOpen, Lock } from "lucide-react";
+import { LockOpen, Lock } from "lucide-react";
 import type { NavigateFn } from "../App";
+import { useHeader } from "../contexts/HeaderContext";
 import { publishUnlock, publishLock } from "../services/mqtt.service";
 
 type NukiState = "idle" | "confirm" | "loading" | "success" | "error";
@@ -9,6 +10,12 @@ type NukiState = "idle" | "confirm" | "loading" | "success" | "error";
 export default function NukiSettings({ navigate }: { navigate: NavigateFn }): React.ReactElement {
   const [unlockState, setUnlockState] = useState<NukiState>("idle");
   const [lockState,   setLockState]   = useState<NukiState>("idle");
+  const { setHeader, clearHeader } = useHeader();
+
+  useEffect(() => {
+    setHeader({ title: "Nuki", onBack: () => navigate("Erweiterungen") });
+    return () => clearHeader();
+  }, []);
 
   const run = async (action: () => Promise<void>, setState: (s: NukiState) => void) => {
     setState("loading");
@@ -42,7 +49,7 @@ export default function NukiSettings({ navigate }: { navigate: NavigateFn }): Re
         </div>
       );
     }
-    const stateColor = state === "success" ? "#16a34a" : state === "error" ? "#dc2626" : "#f97316";
+    const stateColor = state === "success" ? "#16a34a" : state === "error" ? "#dc2626" : "#FF7648";
     const stateBg    = state === "success" ? "#dcfce7" : state === "error" ? "#fee2e2" : "var(--c-accent-bg)";
     return (
       <button
@@ -65,11 +72,6 @@ export default function NukiSettings({ navigate }: { navigate: NavigateFn }): Re
 
   return (
     <div style={styles.container}>
-      <button style={styles.back} onClick={() => navigate("Erweiterungen")}>
-        <ChevronLeft size={20} color="#f97316" />
-        <span style={styles.backLabel}>Erweiterungen</span>
-      </button>
-
       <h1 style={styles.title}>Nuki Smart Lock</h1>
       <p style={styles.subtitle}>Schloss steuern</p>
 
@@ -92,8 +94,8 @@ export default function NukiSettings({ navigate }: { navigate: NavigateFn }): Re
 
 const styles: Record<string, CSSProperties> = {
   container: { padding: "16px 16px", height: "100%", overflowY: "auto" as const },
-  back:      { display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: "0 0 16px", color: "#f97316" },
-  backLabel: { fontSize: 15, fontWeight: 600, color: "#f97316" },
+  back:      { display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: "0 0 16px", color: "#FF7648" },
+  backLabel: { fontSize: 15, fontWeight: 600, color: "#FF7648" },
   title:     { fontSize: 28, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
   subtitle:  { fontSize: 14, color: "var(--c-text-3)", marginTop: 4, marginBottom: 24 },
   section:   { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" },
@@ -102,6 +104,6 @@ const styles: Record<string, CSSProperties> = {
   info:      { flex: 1, display: "flex", flexDirection: "column" as const, gap: 2 },
   label:     { fontSize: 15, fontWeight: 700, color: "var(--c-text-1)" },
   sub:        { fontSize: 12, color: "var(--c-text-3)" },
-  confirmYes: { background: "#f97316", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0 },
+  confirmYes: { background: "#FF7648", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0 },
   confirmNo:  { background: "var(--c-surface-2)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "var(--c-text-2)", cursor: "pointer", flexShrink: 0 },
 };

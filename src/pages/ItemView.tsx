@@ -13,7 +13,7 @@ interface ItemViewProps {
 }
 
 const COLOR_LABELS: Record<string, string> = {
-  "#f97316": "Orange",
+  "#FF7648": "Orange",
   "#ef4444": "Rot",
   "#eab308": "Gelb",
   "#22c55e": "Grün",
@@ -60,7 +60,7 @@ export default function ItemView({ navigate, params }: ItemViewProps): React.Rea
       <div style={styles.header}>
         <h1 style={styles.name}>{product.name}</h1>
         <button
-          style={{ ...styles.cartBtn, background: inCart ? "#c2410c" : "#f97316", opacity: product.quantity === 0 ? 0.4 : 1 }}
+          style={{ ...styles.cartBtn, background: inCart ? "#c2410c" : "#FF7648", opacity: product.quantity === 0 ? 0.4 : 1 }}
           disabled={product.quantity === 0}
           onClick={() => setModalOpen(true)}
         >
@@ -89,7 +89,7 @@ export default function ItemView({ navigate, params }: ItemViewProps): React.Rea
       {/* Ort */}
       {(box || parent) && (
         <div style={styles.locationCard}>
-          <MapPin size={14} color="#f97316" />
+          <MapPin size={14} color="#FF7648" />
           <span style={styles.locationText}>
             {parent ? `${parent.name} › ` : ""}{box?.name}
           </span>
@@ -138,7 +138,7 @@ const styles: Record<string, CSSProperties> = {
   initial: { fontSize: 72, fontWeight: 800, color: "var(--c-border)" },
   header: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12 },
   name: { fontSize: 22, fontWeight: 800, color: "var(--c-text-1)", margin: 0, flex: 1 },
-  cartBtn: { border: "none", borderRadius: 14, width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, boxShadow: "0 4px 12px rgba(249,115,22,0.3)" },
+  cartBtn: { border: "none", borderRadius: 14, width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, boxShadow: "0 4px 12px rgba(255,118,72,0.3)" },
   card: { background: "var(--c-surface)", borderRadius: 16, boxShadow: "var(--neu-raised-sm)", overflow: "hidden", marginBottom: 12 },
   row: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px", borderBottom: "1px solid var(--c-border-2)" },
   rowLabel: { fontSize: 13, color: "var(--c-text-3)", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 },
@@ -146,5 +146,5 @@ const styles: Record<string, CSSProperties> = {
   colorChip: { display: "flex", alignItems: "center", gap: 6 },
   colorDot: { width: 14, height: 14, borderRadius: "50%", flexShrink: 0 },
   locationCard: { display: "flex", alignItems: "center", gap: 8, background: "var(--c-surface)", borderRadius: 16, padding: "12px 16px", boxShadow: "var(--neu-raised-sm)" },
-  locationText: { fontSize: 13, color: "#f97316", fontWeight: 600 },
+  locationText: { fontSize: 13, color: "#FF7648", fontWeight: 600 },
 };

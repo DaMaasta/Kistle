@@ -14,7 +14,7 @@ interface SearchPageProps {
 }
 
 const COLOR_NAMES: Record<string, string> = {
-  "#f97316": "orange",
+  "#FF7648": "orange",
   "#ef4444": "rot",
   "#eab308": "gelb",
   "#22c55e": "grün",
@@ -134,7 +134,7 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
                     )}
                   </div>
                   <button
-                    style={{ ...styles.cartBtn, background: inCart ? "#c2410c" : "#f97316" }}
+                    style={{ ...styles.cartBtn, background: inCart ? "#c2410c" : "#FF7648" }}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!box) return;
@@ -204,6 +204,6 @@ const styles: Record<string, CSSProperties> = {
   itemAvail: { display: "flex", alignItems: "baseline", marginTop: 3 },
   itemQtyNum: { fontSize: 15, fontWeight: 800, color: "var(--c-text-1)" },
   itemUnit: { fontSize: 12, color: "var(--c-text-3)", marginLeft: 3 },
-  itemLocation: { fontSize: 11, color: "#f97316", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" },
+  itemLocation: { fontSize: 11, color: "#FF7648", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" },
   cartBtn: { border: "none", borderRadius: 11, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
 };

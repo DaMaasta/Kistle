@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import BottomSheet from "../components/BottomSheet";
 import type { CSSProperties } from "react";
 import { Users, Plus, ChevronRight, Package, Pencil, Check, X, AlertTriangle, QrCode, Camera, Upload, Copy, RefreshCw, Key, Trash2 } from "lucide-react";
 import jsQR from "jsqr";
@@ -103,17 +104,11 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
     stopCamera();
     setJoinStep("joining");
     try {
+      await joinGroup(groupId, user.uid, user.email ?? "", user.displayName ?? "");
       const space = await getSpace(groupId);
       if (!space) { setJoinError("Ort nicht gefunden."); setJoinStep("error"); return; }
-      if (space.memberIds.includes(user.uid)) {
-        closeJoin();
-        navigate("GroupDetail", { group: space });
-        return;
-      }
-      await joinGroup(groupId, user.uid, user.email ?? "", user.displayName ?? "");
-      const updated = await getSpace(groupId);
       closeJoin();
-      navigate("GroupDetail", { group: updated ?? space });
+      navigate("GroupDetail", { group: space });
     } catch {
       setJoinError("Fehler beim Beitreten. Versuche es erneut.");
       setJoinStep("error");
@@ -204,7 +199,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
       const code = newWithCode && newCodeLength > 0 ? generateAccessCode(newCodeLength) : undefined;
       await createSpace(user.uid, user.email ?? "", user.displayName ?? "", {
         name: newName.trim(), type: "other", description: newDesc.trim(),
-        icon: "👥", color: "#f97316", isGroup: true,
+        icon: "👥", color: "#FF7648", isGroup: true,
         ...(code ? { accessCode: code } : {}),
       });
       setNewName(""); setNewDesc(""); setNewWithCode(false); setNewCodeLength(4); setShowCreate(false);
@@ -281,72 +276,70 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
 
       {/* Beitreten-Modal */}
       {showJoin && (
-        <div style={styles.overlay} onClick={closeJoin}>
-          <div style={styles.joinModal} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.joinHeader}>
-              <div style={styles.joinHeaderLeft}>
-                <div style={styles.joinHeaderIcon}><QrCode size={16} color="#f97316" /></div>
-                <span style={styles.joinTitle}>Ort beitreten</span>
-              </div>
-              <button style={styles.closeBtn} onClick={closeJoin}><X size={18} color="#94a3b8" /></button>
+        <BottomSheet onClose={closeJoin}>
+          <div style={styles.joinHeader}>
+            <div style={styles.joinHeaderLeft}>
+              <div style={styles.joinHeaderIcon}><QrCode size={16} color="#FF7648" /></div>
+              <span style={styles.joinTitle}>Ort beitreten</span>
             </div>
-
-            {joinStep === "choose" && (
-              <>
-                <p style={styles.joinSub}>Scanne den QR-Code des Ortes oder lade ein Bild hoch.</p>
-                <div style={styles.joinOptions}>
-                  <button style={styles.joinOptionBtn} onClick={startCamera}>
-                    <div style={styles.joinOptionIcon}><Camera size={28} color="#f97316" /></div>
-                    <span style={styles.joinOptionLabel}>Kamera</span>
-                    <span style={styles.joinOptionSub}>QR-Code scannen</span>
-                  </button>
-                  <button style={styles.joinOptionBtn} onClick={() => fileInputRef.current?.click()}>
-                    <div style={styles.joinOptionIcon}><Upload size={28} color="#f97316" /></div>
-                    <span style={styles.joinOptionLabel}>Bild hochladen</span>
-                    <span style={styles.joinOptionSub}>Aus Fotos wählen</span>
-                  </button>
-                </div>
-                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
-              </>
-            )}
-
-            {joinStep === "camera" && (
-              <>
-                <p style={styles.joinSub}>Halte die Kamera auf den QR-Code des Ortes.</p>
-                <div style={styles.cameraWrap}>
-                  <video ref={videoRef} style={styles.cameraVideo} playsInline muted />
-                  <canvas ref={canvasRef} style={{ display: "none" }} />
-                  <div style={styles.scanFrame} />
-                </div>
-                <button style={styles.cancelJoinBtn} onClick={() => { stopCamera(); setJoinStep("choose"); }}>Abbrechen</button>
-              </>
-            )}
-
-            {(joinStep === "uploading" || joinStep === "joining") && (
-              <div style={styles.joinLoading}>
-                <div style={styles.spinner} />
-                <p style={styles.joinLoadingText}>
-                  {joinStep === "uploading" ? "Bild wird gelesen…" : "Ort wird beigetreten…"}
-                </p>
-              </div>
-            )}
-
-            {joinStep === "error" && (
-              <>
-                <div style={styles.joinErrorBox}>{joinError}</div>
-                <div style={styles.joinRetryRow}>
-                  <button style={styles.cancelJoinBtn} onClick={() => setJoinStep("choose")}>Erneut versuchen</button>
-                </div>
-              </>
-            )}
+            <button style={styles.closeBtn} onClick={closeJoin}><X size={18} color="#94a3b8" /></button>
           </div>
-        </div>
+
+          {joinStep === "choose" && (
+            <>
+              <p style={styles.joinSub}>Scanne den QR-Code des Ortes oder lade ein Bild hoch.</p>
+              <div style={styles.joinOptions}>
+                <button style={styles.joinOptionBtn} onClick={startCamera}>
+                  <div style={styles.joinOptionIcon}><Camera size={28} color="#FF7648" /></div>
+                  <span style={styles.joinOptionLabel}>Kamera</span>
+                  <span style={styles.joinOptionSub}>QR-Code scannen</span>
+                </button>
+                <button style={styles.joinOptionBtn} onClick={() => fileInputRef.current?.click()}>
+                  <div style={styles.joinOptionIcon}><Upload size={28} color="#FF7648" /></div>
+                  <span style={styles.joinOptionLabel}>Bild hochladen</span>
+                  <span style={styles.joinOptionSub}>Aus Fotos wählen</span>
+                </button>
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
+            </>
+          )}
+
+          {joinStep === "camera" && (
+            <>
+              <p style={styles.joinSub}>Halte die Kamera auf den QR-Code des Ortes.</p>
+              <div style={styles.cameraWrap}>
+                <video ref={videoRef} style={styles.cameraVideo} playsInline muted />
+                <canvas ref={canvasRef} style={{ display: "none" }} />
+                <div style={styles.scanFrame} />
+              </div>
+              <button style={styles.cancelJoinBtn} onClick={() => { stopCamera(); setJoinStep("choose"); }}>Abbrechen</button>
+            </>
+          )}
+
+          {(joinStep === "uploading" || joinStep === "joining") && (
+            <div style={styles.joinLoading}>
+              <div style={styles.spinner} />
+              <p style={styles.joinLoadingText}>
+                {joinStep === "uploading" ? "Bild wird gelesen…" : "Ort wird beigetreten…"}
+              </p>
+            </div>
+          )}
+
+          {joinStep === "error" && (
+            <>
+              <div style={styles.joinErrorBox}>{joinError}</div>
+              <div style={styles.joinRetryRow}>
+                <button style={styles.cancelJoinBtn} onClick={() => setJoinStep("choose")}>Erneut versuchen</button>
+              </div>
+            </>
+          )}
+        </BottomSheet>
       )}
 
       <div style={styles.topRow}>
         <div style={styles.topBtns}>
           <button style={styles.joinBtn} onClick={() => { setShowJoin(true); setJoinStep("choose"); setJoinError(""); }}>
-            <QrCode size={15} color="#f97316" /> Beitreten
+            <QrCode size={15} color="#FF7648" /> Beitreten
           </button>
           <button style={styles.newBtn} onClick={() => setShowCreate(true)}>
             <Plus size={16} color="#fff" /> Neues Lager
@@ -362,7 +355,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
             onChange={(e) => setNewDesc(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCreate()} />
           <button style={styles.codeToggle} onClick={() => { setNewWithCode((v) => !v); setNewCodeLength(4); }} type="button">
             <span style={styles.codeToggleLabel}>Zugangscode</span>
-            <div style={{ ...styles.toggle2, background: newWithCode ? "#f97316" : "var(--c-surface-2)" }}>
+            <div style={{ ...styles.toggle2, background: newWithCode ? "#FF7648" : "var(--c-surface-2)" }}>
               <div style={{ ...styles.toggleThumb2, transform: newWithCode ? "translateX(18px)" : "translateX(0)" }} />
             </div>
           </button>
@@ -433,7 +426,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
                     <div style={styles.listRow}>
                       <button style={styles.listMain} onClick={() => navigate("GroupDetail", { group: g })}>
                         <div style={styles.listIcon}>
-                          <Package size={18} color="#f97316" />
+                          <Package size={18} color="#FF7648" />
                         </div>
                         <div style={styles.listInfo}>
                           <span style={styles.listName}>{g.name}</span>
@@ -454,7 +447,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
 
                     {/* Zutritt row — nur wenn Code vorhanden */}
                     {g.accessCode && <div style={styles.zutrittRow}>
-                      <div style={styles.zutrittIcon}><Key size={13} color="#f97316" /></div>
+                      <div style={styles.zutrittIcon}><Key size={13} color="#FF7648" /></div>
                       <span style={styles.zutrittLabel}>Zutritt</span>
                       <span style={styles.zutrittCode}>{g.accessCode ?? "—"}</span>
                       <div style={styles.zutrittActions}>
@@ -474,7 +467,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
                               disabled={isRegenerating}
                               title="Neuen Code generieren"
                             >
-                              <RefreshCw size={13} color={regenConfirmId === g.id ? "#f97316" : "var(--c-text-3)"}
+                              <RefreshCw size={13} color={regenConfirmId === g.id ? "#FF7648" : "var(--c-text-3)"}
                                 style={{ animation: isRegenerating ? "spin 0.8s linear infinite" : "none" }} />
                             </button>
                           </>
@@ -498,7 +491,7 @@ const styles: Record<string, CSSProperties> = {
   title: { fontSize: 28, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
   subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4, marginBottom: 12 },
   topBtns: { display: "flex", gap: 8, alignItems: "center" },
-  joinBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-accent-bg)", color: "#f97316", border: "1.5px solid #f97316", borderRadius: 10, padding: "7px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const },
+  joinBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-accent-bg)", color: "#FF7648", border: "1.5px solid #FF7648", borderRadius: 10, padding: "7px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const },
   newBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-dark-btn)", color: "var(--c-dark-btn-text)", border: "none", borderRadius: 10, padding: "7px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const },
   createCard: { background: "var(--c-surface)", borderRadius: 16, padding: 16, marginBottom: 16, boxShadow: "var(--neu-raised)" },
   createInput: { width: "100%", border: "1px solid var(--c-border)", borderRadius: 10, padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" as const, background: "var(--c-bg)", color: "var(--c-text-1)" },
@@ -509,7 +502,7 @@ const styles: Record<string, CSSProperties> = {
   toggleThumb2: { position: "absolute" as const, top: 3, left: 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "transform 0.2s" },
   createActions: { display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" },
   cancelBtn: { background: "var(--c-surface-2)", border: "none", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--c-text-2)" },
-  saveBtn: { background: "#f97316", border: "none", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff" },
+  saveBtn: { background: "#FF7648", border: "none", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff" },
   emptyState: { textAlign: "center" as const, padding: "60px 20px", display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 12 },
   emptyText: { fontSize: 14, color: "var(--c-text-3)", maxWidth: 240 },
   list: { display: "flex", flexDirection: "column" as const, gap: 10 },
@@ -526,10 +519,10 @@ const styles: Record<string, CSSProperties> = {
   zutrittCode: { fontSize: 18, fontWeight: 800, color: "var(--c-text-1)", letterSpacing: "0.18em", fontFamily: "ui-monospace,'SF Mono',monospace", flex: 1 },
   zutrittActions: { display: "flex", gap: 2 },
   zutrittBtn: { background: "none", border: "none", cursor: "pointer", padding: 5, display: "flex", alignItems: "center", borderRadius: 6 },
-  regenHint: { fontSize: 10, fontWeight: 700, color: "#f97316", whiteSpace: "nowrap" as const },
+  regenHint: { fontSize: 10, fontWeight: 700, color: "#FF7648", whiteSpace: "nowrap" as const },
   iconBtn: { background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex", alignItems: "center" },
   editCard: { background: "var(--c-surface)", borderRadius: 16, padding: 14 },
-  editInput: { width: "100%", border: "1px solid #f97316", borderRadius: 8, padding: "8px 12px", fontSize: 14, outline: "none", background: "var(--c-bg)", color: "var(--c-text-1)", boxSizing: "border-box" as const },
+  editInput: { width: "100%", border: "1px solid #FF7648", borderRadius: 8, padding: "8px 12px", fontSize: 14, outline: "none", background: "var(--c-bg)", color: "var(--c-text-1)", boxSizing: "border-box" as const },
   editActions: { display: "flex", gap: 8, marginTop: 10 },
   editSaveBtn:   { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "#22c55e", border: "none", borderRadius: 10, padding: "10px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer" },
   editCancelBtn: { flex: 1, background: "var(--c-surface-2)", border: "none", borderRadius: 10, padding: "10px 0", fontSize: 13, fontWeight: 600, color: "var(--c-text-2)", cursor: "pointer" },
@@ -560,12 +553,12 @@ const styles: Record<string, CSSProperties> = {
   cameraVideo: { width: "100%", height: "100%", objectFit: "cover" as const, display: "block" },
   scanFrame: {
     position: "absolute", inset: "20%",
-    border: "2.5px solid #f97316", borderRadius: 12,
+    border: "2.5px solid #FF7648", borderRadius: 12,
     boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
   },
   cancelJoinBtn: { background: "var(--c-surface-2)", border: "none", borderRadius: 12, padding: "12px 0", fontSize: 14, fontWeight: 600, color: "var(--c-text-2)", cursor: "pointer", width: "100%" },
   joinLoading: { display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 16, padding: "32px 0" },
-  spinner: { width: 36, height: 36, border: "3px solid var(--c-border)", borderTop: "3px solid #f97316", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
+  spinner: { width: 36, height: 36, border: "3px solid var(--c-border)", borderTop: "3px solid #FF7648", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
   joinLoadingText: { fontSize: 14, color: "var(--c-text-3)", margin: 0 },
   joinErrorBox: { background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "#dc2626" },
   joinRetryRow: { display: "flex" },

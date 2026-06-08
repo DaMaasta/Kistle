@@ -6,6 +6,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import type { NavigateFn } from "../App";
+import { api } from "../config/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useHeader } from "../contexts/HeaderContext";
 import {
@@ -216,10 +217,23 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
     }
   };
 
-  const handleOpenFile = (file: DocFile) => {
-    if (file.mimeType.startsWith("image/")) {
-      setPreviewUrl(file.url);
-    } else {
+  const handleOpenFile = async (file: DocFile) => {
+    try {
+      const filename = file.url.split('/').pop() ?? '';
+      const blob = await api.blob(`/documents/serve/${filename}`);
+      const objectUrl = URL.createObjectURL(blob);
+      if (file.mimeType.startsWith("image/")) {
+        setPreviewUrl(objectUrl);
+      } else {
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+      }
+    } catch {
+      // fallback: direct open
       window.open(file.url, "_blank");
     }
   };
@@ -263,7 +277,7 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
             onClick={() => { newFolderActiveRef.current = true; setShowNewFolder(true); setNewFolderName(""); }}
             title="Neuer Ordner"
           >
-            <Plus size={15} color="#f97316" />
+            <Plus size={15} color="#FF7648" />
             <span style={styles.btnLabel}>Ordner</span>
           </button>
           <button
@@ -310,7 +324,7 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
       {/* New folder input */}
       {showNewFolder && (
         <div style={styles.newFolderCard}>
-          <Folder size={17} color="#f97316" />
+          <Folder size={17} color="#FF7648" />
           <input
             style={styles.newFolderInput}
             placeholder="Ordnername…"
@@ -326,7 +340,7 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
             <X size={14} color="var(--c-text-3)" />
           </button>
           <button style={styles.smallBtn} onClick={handleCreateFolder} disabled={creating}>
-            <Check size={14} color="#f97316" />
+            <Check size={14} color="#FF7648" />
           </button>
         </div>
       )}
@@ -382,7 +396,7 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
               {editingFolderId === folder.id ? (
                 /* Rename mode */
                 <div style={styles.renameRow}>
-                  <Folder size={17} color="#f97316" style={{ flexShrink: 0 }} />
+                  <Folder size={17} color="#FF7648" style={{ flexShrink: 0 }} />
                   <input
                     style={styles.renameInput}
                     value={editFolderName}
@@ -405,7 +419,7 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
                 <>
                   <button style={styles.rowMain} onClick={() => enterFolder(folder)}>
                     <div style={styles.folderIconBox}>
-                      <Folder size={19} color="#f97316" />
+                      <Folder size={19} color="#FF7648" />
                     </div>
                     <span style={styles.rowName}>{folder.name}</span>
                     <ChevronRight size={15} color="var(--c-text-4)" style={{ flexShrink: 0 }} />
@@ -496,15 +510,15 @@ const styles: Record<string, CSSProperties> = {
   headerBtns: { display: "flex", gap: 8, marginTop: 6, flexShrink: 0 },
   outlineBtn: {
     display: "flex", alignItems: "center", gap: 5,
-    background: "var(--c-accent-bg)", border: "1.5px solid #f97316",
+    background: "var(--c-accent-bg)", border: "1.5px solid #FF7648",
     borderRadius: 10, padding: "7px 10px", cursor: "pointer",
   },
   solidBtn: {
     display: "flex", alignItems: "center", gap: 5,
-    background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
     border: "none", borderRadius: 10, padding: "7px 10px", cursor: "pointer",
   },
-  btnLabel: { fontSize: 12, fontWeight: 600, color: "#f97316" },
+  btnLabel: { fontSize: 12, fontWeight: 600, color: "#FF7648" },
   btnLabelWhite: { fontSize: 12, fontWeight: 600, color: "#fff" },
 
   breadcrumbs: { display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 12 },
@@ -514,7 +528,7 @@ const styles: Record<string, CSSProperties> = {
     display: "flex", alignItems: "center", gap: 10,
     background: "var(--c-surface)", borderRadius: 14, padding: "11px 14px",
     marginBottom: 8, boxShadow: "var(--neu-raised)",
-    border: "1.5px solid #f97316",
+    border: "1.5px solid #FF7648",
   },
   newFolderInput: {
     flex: 1, border: "none", outline: "none", fontSize: 14,
@@ -532,7 +546,7 @@ const styles: Record<string, CSSProperties> = {
   },
   progressFill: {
     position: "absolute", left: 0, top: 0, bottom: 0,
-    background: "linear-gradient(90deg, #f97316 0%, #ea580c 100%)",
+    background: "linear-gradient(90deg, #FF7648 0%, #e5623a 100%)",
     transition: "width 0.2s ease",
   },
   progressText: {
@@ -554,7 +568,7 @@ const styles: Record<string, CSSProperties> = {
   emptyTitle: { fontSize: 16, fontWeight: 700, color: "var(--c-text-2)", margin: 0 },
   emptyText: { fontSize: 13, color: "var(--c-text-3)", maxWidth: 240, margin: 0 },
 
-  list: { display: "flex", flexDirection: "column", gap: 4 },
+  list: { display: "flex", flexDirection: "column", gap: 10 },
 
   row: {
     display: "flex", alignItems: "center",
@@ -594,7 +608,7 @@ const styles: Record<string, CSSProperties> = {
 
   renameRow: {
     flex: 1, display: "flex", alignItems: "center", gap: 10,
-    padding: "10px 14px", border: "1.5px solid #f97316", borderRadius: 14,
+    padding: "10px 14px", border: "1.5px solid #FF7648", borderRadius: 14,
     background: "var(--c-surface)",
   },
   renameInput: {

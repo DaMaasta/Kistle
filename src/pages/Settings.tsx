@@ -5,7 +5,6 @@ import { User, ChevronRight, LogOut, Puzzle } from "lucide-react";
 import type { NavigateFn } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import { logoutUser } from "../services/auth.service";
-import { getInitials } from "../utils/stringUtils";
 
 interface RowProps {
   icon: React.ElementType;
@@ -24,14 +23,14 @@ function Row({ icon: Icon, label, value, toggle, onToggle, onClick, last }: RowP
       onClick={onClick ?? onToggle}
     >
       <div style={styles.rowIcon}>
-        <Icon size={17} color="#f97316" />
+        <Icon size={17} color="#FF7648" />
       </div>
       <div style={styles.rowContent}>
         <span style={styles.rowLabel}>{label}</span>
         {value !== undefined && <span style={styles.rowValue}>{value}</span>}
       </div>
       {toggle !== undefined ? (
-        <div style={{ ...styles.toggle, background: toggle ? "#f97316" : "var(--c-surface-2)" }}>
+        <div style={{ ...styles.toggle, background: toggle ? "#FF7648" : "var(--c-surface-2)" }}>
           <div style={{ ...styles.toggleThumb, transform: toggle ? "translateX(18px)" : "translateX(0)" }} />
         </div>
       ) : (
@@ -43,20 +42,14 @@ function Row({ icon: Icon, label, value, toggle, onToggle, onClick, last }: RowP
 
 export default function Settings({ navigate }: { navigate: NavigateFn }): React.ReactElement {
   const { user } = useAuth();
-  const displayName = user?.displayName ?? user?.email ?? "Unbekannt";
-  const email       = user?.email ?? "";
-  const initials    = getInitials(displayName) || "?";
+  const displayName = user?.displayName ?? user?.email ?? "";
+  const email = user?.email ?? "";
   const [logoutConfirm, setLogoutConfirm] = React.useState(false);
 
   return (
     <div style={styles.container}>
-      {/* Profil-Karte */}
-      <div style={styles.profileCard}>
-        <div style={styles.profileAvatar}>{initials}</div>
-        <div>
-          <div style={styles.profileName}>{displayName}</div>
-          <div style={styles.profileEmail}>{email}</div>
-        </div>
+      <div style={styles.profileHeader}>
+        <div style={styles.profileName}>{displayName}</div>
       </div>
 
       {/* Konto */}
@@ -92,20 +85,26 @@ export default function Settings({ navigate }: { navigate: NavigateFn }): React.
 
 const styles: Record<string, CSSProperties> = {
   container: { padding: "20px 16px", height: "100%", overflowY: "auto" as const },
+  profileHeader: { marginBottom: 24 },
+  profileName: { fontSize: 26, fontWeight: 800, color: "var(--c-text-1)" },
   title:    { fontSize: 28, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
   subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4, marginBottom: 20 },
   profileCard: {
-    background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
     borderRadius: 18, padding: "20px",
     display: "flex", alignItems: "center", gap: 16, marginBottom: 24,
   },
   profileAvatar: {
-    width: 52, height: 52, borderRadius: "50%",
+    width: 56, height: 56, borderRadius: "50%",
     background: "rgba(255,255,255,0.2)", color: "#fff",
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: 18, fontWeight: 800, flexShrink: 0,
+    fontSize: 20, fontWeight: 800, flexShrink: 0,
   },
-  profileName:  { fontSize: 17, fontWeight: 700, color: "#fff", marginBottom: 2 },
+  profileAvatarImg: {
+    width: 56, height: 56, borderRadius: "50%",
+    objectFit: "cover" as const, flexShrink: 0,
+    border: "2px solid rgba(255,255,255,0.4)",
+  },
   profileEmail: { fontSize: 13, color: "rgba(255,255,255,0.75)" },
   sectionLabel: { fontSize: 11, fontWeight: 700, color: "var(--c-text-3)", letterSpacing: "0.08em", marginBottom: 8, marginTop: 4 },
   section: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--neu-raised-sm)", marginBottom: 20 },

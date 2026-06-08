@@ -1,7 +1,7 @@
 {
   "name": "kistle",
   "private": true,
-  "version": "4.47",
+  "version": "5.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

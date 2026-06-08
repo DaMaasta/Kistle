@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { CSSProperties } from "react";
-import { ChevronLeft, Eye, EyeOff, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Trash2 } from "lucide-react";
 import type { NavigateFn } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import { changePassword, deleteAccount } from "../services/auth.service";
+import { useHeader } from "../contexts/HeaderContext";
 
 interface AccountSettingsProps {
   navigate: NavigateFn;
@@ -19,6 +20,12 @@ function mapError(e: unknown): string {
 
 export default function AccountSettings({ navigate }: AccountSettingsProps): React.ReactElement {
   const { user } = useAuth();
+  const { setHeader, clearHeader } = useHeader();
+
+  useEffect(() => {
+    setHeader({ title: "Konto", onBack: () => navigate("Settings") });
+    return () => clearHeader();
+  }, []);
 
   const isEmailUser = false;
 
@@ -73,11 +80,6 @@ export default function AccountSettings({ navigate }: AccountSettingsProps): Rea
 
   return (
     <div style={styles.container}>
-      <button style={styles.back} onClick={() => navigate("Settings")}>
-        <ChevronLeft size={16} color="#f97316" />
-        <span style={styles.backText}>Einstellungen</span>
-      </button>
-
       <h1 style={styles.title}>Konto</h1>
       <p style={styles.subtitle}>{user?.email}</p>
 
@@ -210,7 +212,7 @@ function PasswordInput({ label, value, onChange, show, onToggle }: PasswordInput
 const styles: Record<string, CSSProperties> = {
   container: { padding: "16px" },
   back:      { display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", marginBottom: 20 },
-  backText:  { color: "#f97316", fontSize: 14, fontWeight: 600 },
+  backText:  { color: "#FF7648", fontSize: 14, fontWeight: 600 },
   title:     { fontSize: 26, fontWeight: 800, color: "var(--c-text-1)", margin: "0 0 2px" },
   subtitle:  { fontSize: 13, color: "var(--c-text-3)", marginBottom: 24 },
   sectionLabel: { fontSize: 11, fontWeight: 700, color: "var(--c-text-3)", letterSpacing: "0.08em", marginBottom: 8 },
@@ -223,7 +225,7 @@ const styles: Record<string, CSSProperties> = {
   eyeBtn: { background: "none", border: "none", cursor: "pointer", padding: 10, display: "flex", alignItems: "center", flexShrink: 0, minWidth: 44, minHeight: 44, justifyContent: "center" },
   saveBtn: {
     width: "100%", padding: "14px", border: "none", borderRadius: 14,
-    background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
     color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 8,
   },
   errorBox:   { background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#991b1b", marginBottom: 10 },

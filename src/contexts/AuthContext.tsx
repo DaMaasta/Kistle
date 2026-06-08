@@ -4,10 +4,11 @@ import { api, setToken, clearToken, isLoggedIn } from '../config/api';
 
 export interface AppUser {
   id: string;
-  uid: string;         // Alias für id — Rückwärtskompatibilität mit bestehenden Komponenten
+  uid: string;
   userId: string;
   email: string;
   displayName: string;
+  photoURL: string;
 }
 
 interface AuthContextType {
@@ -25,8 +26,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function loadUser() {
     if (!isLoggedIn()) { setLoading(false); return; }
     try {
-      const data = await api.get<{ userId: string; email: string; displayName: string }>('/auth/me');
-      setUser({ id: data.userId, uid: data.userId, userId: data.userId, email: data.email, displayName: data.displayName });
+      const data = await api.get<{ userId: string; email: string; displayName: string; photoURL: string }>('/auth/me');
+      setUser({ id: data.userId, uid: data.userId, userId: data.userId, email: data.email, displayName: data.displayName, photoURL: data.photoURL ?? '' });
     } catch {
       clearToken();
     } finally {

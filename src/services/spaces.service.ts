@@ -160,7 +160,7 @@ export async function createSpace(
     id, ownerId: '', memberIds: [], members: {},
     createdAt: now(), updatedAt: now(),
     name: '', type: 'other', description: '', icon: '📦',
-    color: '#f97316', isGroup: false, parentId: null,
+    color: '#FF7648', isGroup: false, parentId: null,
     ...data,
   };
   pendingCreates.set(id, optimistic);

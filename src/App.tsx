@@ -16,7 +16,7 @@ import LoginPage from "./pages/LoginPage";
 import UnboxedDetail from "./pages/UnboxedDetail";
 import ItemView from "./pages/ItemView";
 import { useAuth } from "./contexts/AuthContext";
-import { getSpace } from "./services/spaces.service";
+import { getSpace, joinGroup } from "./services/spaces.service";
 
 export type PageName =
   | "Dokumente"
@@ -125,7 +125,9 @@ export default function App(): React.ReactElement {
   // Invite-Link handling — always clear the URL param, whether the space exists or not
   useEffect(() => {
     if (!user || !pendingInvite) return;
-    getSpace(pendingInvite)
+    joinGroup(pendingInvite, user.uid, user.email ?? "", user.displayName ?? "")
+      .catch(() => { /* already member or error — continue anyway */ })
+      .then(() => getSpace(pendingInvite))
       .then((group) => {
         clearInviteParam();
         if (group) {
@@ -201,7 +203,7 @@ export default function App(): React.ReactElement {
 
 const updateBannerStyle: CSSProperties = {
   position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999,
-  background: "#f97316", color: "#fff",
+  background: "#FF7648", color: "#fff",
   padding: "10px 16px",
   paddingTop: "calc(10px + env(safe-area-inset-top))",
   textAlign: "center", fontSize: 13, fontWeight: 600,
@@ -213,7 +215,7 @@ const spinnerStyles: Record<string, CSSProperties> = {
   spinner: {
     width: 40, height: 40,
     border: "3px solid #e2e8f0",
-    borderTopColor: "#f97316",
+    borderTopColor: "#FF7648",
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },

@@ -199,7 +199,7 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: "var(--neu-inset-sm)",
   },
   submitBtn: {
-    background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
     color: "#fff", border: "none", borderRadius: 12,
     padding: "14px 0", fontSize: 16, fontWeight: 700, cursor: "pointer",
     marginTop: 4,
@@ -207,7 +207,7 @@ const styles: Record<string, CSSProperties> = {
   fieldHint: { fontSize: 11, color: "var(--c-text-3)", marginTop: 2 },
   switchRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 20 },
   switchText: { fontSize: 13, color: "var(--c-text-3)" },
-  switchBtn: { background: "none", border: "none", color: "#f97316", fontSize: 13, fontWeight: 700, cursor: "pointer" },
+  switchBtn: { background: "none", border: "none", color: "#FF7648", fontSize: 13, fontWeight: 700, cursor: "pointer" },
   googleBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--c-bg)", border: "none", borderRadius: 12, padding: "12px 0", fontSize: 14, fontWeight: 600, color: "var(--c-text-1)", cursor: "pointer", width: "100%", boxShadow: "var(--neu-raised-sm)" },
   divider: { display: "flex", alignItems: "center", justifyContent: "center", margin: "14px 0" },
   dividerText: { fontSize: 12, color: "var(--c-text-3)", whiteSpace: "nowrap" as const },
