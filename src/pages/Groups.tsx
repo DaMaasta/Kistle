@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import BottomSheet from "../components/BottomSheet";
 import type { CSSProperties } from "react";
-import { Users, Plus, ChevronRight, Package, Pencil, Check, X, AlertTriangle, QrCode, Camera, Upload, Copy, RefreshCw, Key, Trash2 } from "lucide-react";
+import { Users, Plus, ChevronRight, Package, Pencil, Check, X, AlertTriangle, QrCode, Camera, Upload, Copy, RefreshCw, Key, Trash2, FolderOpen } from "lucide-react";
 import jsQR from "jsqr";
 import type { NavigateFn } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import { subscribeToUserSpaces, createSpace, updateSpace, deleteSpace, removeAccessCode, getSpaceContentCount, joinGroup, getSpace, regenerateAccessCode, generateAccessCode } from "../services/spaces.service";
+import { api } from "../config/api";
+import type { DocFolder } from "../services/documents.service";
 import type { Space } from "../types";
 
 interface GroupsProps {
@@ -46,6 +48,15 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
   const [editCodeDirty, setEditCodeDirty] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirm | null>(null);
   const [checkingId, setCheckingId]       = useState<string | null>(null);
+
+  // Folder state
+  const [rootFolders, setRootFolders]             = useState<DocFolder[]>([]);
+  const [editFolderId, setEditFolderId]           = useState<string | null>(null);
+  const [showEditFolderPicker, setShowEditFolderPicker] = useState(false);
+
+  useEffect(() => {
+    api.get<DocFolder[]>('/documents/folders?parentId=').then(setRootFolders).catch(() => {});
+  }, []);
 
   // Zutritt state
   const [copiedId, setCopiedId]             = useState<string | null>(null);
@@ -199,7 +210,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
       const code = newWithCode && newCodeLength > 0 ? generateAccessCode(newCodeLength) : undefined;
       await createSpace(user.uid, user.email ?? "", user.displayName ?? "", {
         name: newName.trim(), type: "other", description: newDesc.trim(),
-        icon: "👥", color: "#FF7648", isGroup: true,
+        icon: "👥", color: "#2C2926", isGroup: true,
         ...(code ? { accessCode: code } : {}),
       });
       setNewName(""); setNewDesc(""); setNewWithCode(false); setNewCodeLength(4); setShowCreate(false);
@@ -213,21 +224,24 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
     setEditName(g.name);
     setEditCodeLength(g.accessCode?.length ?? 0);
     setEditCodeDirty(false);
+    setEditFolderId(g.folderId ?? null);
+    setShowEditFolderPicker(false);
   };
 
   const handleEdit = async () => {
     if (!editName.trim() || !editingId) return;
+    const folderUpdate = { folderId: editFolderId };
     if (editCodeDirty) {
       if (editCodeLength === 0) {
         await Promise.all([
-          updateSpace(editingId, { name: editName.trim() }),
+          updateSpace(editingId, { name: editName.trim(), ...folderUpdate }),
           removeAccessCode(editingId),
         ]);
       } else {
-        await updateSpace(editingId, { name: editName.trim(), accessCode: generateAccessCode(editCodeLength) });
+        await updateSpace(editingId, { name: editName.trim(), accessCode: generateAccessCode(editCodeLength), ...folderUpdate });
       }
     } else {
-      await updateSpace(editingId, { name: editName.trim() });
+      await updateSpace(editingId, { name: editName.trim(), ...folderUpdate });
     }
     setEditingId(null);
   };
@@ -279,7 +293,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
         <BottomSheet onClose={closeJoin}>
           <div style={styles.joinHeader}>
             <div style={styles.joinHeaderLeft}>
-              <div style={styles.joinHeaderIcon}><QrCode size={16} color="#FF7648" /></div>
+              <div style={styles.joinHeaderIcon}><QrCode size={16} color="#2C2926" /></div>
               <span style={styles.joinTitle}>Ort beitreten</span>
             </div>
             <button style={styles.closeBtn} onClick={closeJoin}><X size={18} color="#94a3b8" /></button>
@@ -290,12 +304,12 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
               <p style={styles.joinSub}>Scanne den QR-Code des Ortes oder lade ein Bild hoch.</p>
               <div style={styles.joinOptions}>
                 <button style={styles.joinOptionBtn} onClick={startCamera}>
-                  <div style={styles.joinOptionIcon}><Camera size={28} color="#FF7648" /></div>
+                  <div style={styles.joinOptionIcon}><Camera size={28} color="#2C2926" /></div>
                   <span style={styles.joinOptionLabel}>Kamera</span>
                   <span style={styles.joinOptionSub}>QR-Code scannen</span>
                 </button>
                 <button style={styles.joinOptionBtn} onClick={() => fileInputRef.current?.click()}>
-                  <div style={styles.joinOptionIcon}><Upload size={28} color="#FF7648" /></div>
+                  <div style={styles.joinOptionIcon}><Upload size={28} color="#2C2926" /></div>
                   <span style={styles.joinOptionLabel}>Bild hochladen</span>
                   <span style={styles.joinOptionSub}>Aus Fotos wählen</span>
                 </button>
@@ -339,7 +353,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
       <div style={styles.topRow}>
         <div style={styles.topBtns}>
           <button style={styles.joinBtn} onClick={() => { setShowJoin(true); setJoinStep("choose"); setJoinError(""); }}>
-            <QrCode size={15} color="#FF7648" /> Beitreten
+            <QrCode size={15} color="var(--c-dark-btn-text)" /> Beitreten
           </button>
           <button style={styles.newBtn} onClick={() => setShowCreate(true)}>
             <Plus size={16} color="#fff" /> Neues Lager
@@ -355,7 +369,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
             onChange={(e) => setNewDesc(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCreate()} />
           <button style={styles.codeToggle} onClick={() => { setNewWithCode((v) => !v); setNewCodeLength(4); }} type="button">
             <span style={styles.codeToggleLabel}>Zugangscode</span>
-            <div style={{ ...styles.toggle2, background: newWithCode ? "#FF7648" : "var(--c-surface-2)" }}>
+            <div style={{ ...styles.toggle2, background: newWithCode ? "#2C2926" : "var(--c-surface-2)" }}>
               <div style={{ ...styles.toggleThumb2, transform: newWithCode ? "translateX(18px)" : "translateX(0)" }} />
             </div>
           </button>
@@ -404,6 +418,41 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
                         {editCodeLength === 0 ? "(kein Code)" : "→ neuer Code wird generiert"}
                       </span>
                     </div>
+
+                    {/* Ordner */}
+                    <button style={styles.codeToggle} onClick={() => setShowEditFolderPicker(v => !v)} type="button">
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <FolderOpen size={13} color="var(--c-text-2)" />
+                        <span style={styles.codeToggleLabel}>Ordner</span>
+                      </div>
+                      <span style={{ fontSize: 12, color: "var(--c-text-3)" }}>
+                        {editFolderId ? (rootFolders.find(f => f.id === editFolderId)?.name ?? "Verknüpft") : "Kein Ordner"}
+                      </span>
+                    </button>
+                    {showEditFolderPicker && (
+                      <div style={{ display: "flex", flexDirection: "column" as const, gap: 3, marginTop: 4 }}>
+                        <button
+                          style={{ ...styles.folderPickerItem, background: !editFolderId ? "var(--c-accent-bg)" : "var(--c-bg)" }}
+                          onClick={() => { setEditFolderId(null); setShowEditFolderPicker(false); }}
+                        >
+                          <X size={13} color="var(--c-text-3)" />
+                          <span style={{ fontSize: 13, color: "var(--c-text-1)", flex: 1 }}>Kein Ordner</span>
+                          {!editFolderId && <Check size={12} color="#2C2926" />}
+                        </button>
+                        {rootFolders.map(f => (
+                          <button
+                            key={f.id}
+                            style={{ ...styles.folderPickerItem, background: editFolderId === f.id ? "var(--c-accent-bg)" : "var(--c-bg)" }}
+                            onClick={() => { setEditFolderId(f.id); setShowEditFolderPicker(false); }}
+                          >
+                            <FolderOpen size={13} color="var(--c-text-3)" />
+                            <span style={{ fontSize: 13, color: "var(--c-text-1)", flex: 1 }}>{f.name}</span>
+                            {editFolderId === f.id && <Check size={12} color="#2C2926" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <div style={styles.editActions}>
                       <button style={styles.editSaveBtn} onClick={handleEdit}>
                         <Check size={14} color="#fff" /> Speichern
@@ -426,7 +475,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
                     <div style={styles.listRow}>
                       <button style={styles.listMain} onClick={() => navigate("GroupDetail", { group: g })}>
                         <div style={styles.listIcon}>
-                          <Package size={18} color="#FF7648" />
+                          <Package size={18} color="#2C2926" />
                         </div>
                         <div style={styles.listInfo}>
                           <span style={styles.listName}>{g.name}</span>
@@ -438,7 +487,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
                         </div>
                         <ChevronRight size={15} color="var(--c-text-4)" />
                       </button>
-                      {g.members[user?.uid ?? ""]?.role !== "viewer" && (
+                      {isOwner && (
                         <button style={styles.iconBtn} onClick={() => startEdit(g)}>
                           <Pencil size={14} color="var(--c-text-3)" />
                         </button>
@@ -447,7 +496,7 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
 
                     {/* Zutritt row — nur wenn Code vorhanden */}
                     {g.accessCode && <div style={styles.zutrittRow}>
-                      <div style={styles.zutrittIcon}><Key size={13} color="#FF7648" /></div>
+                      <div style={styles.zutrittIcon}><Key size={13} color="#2C2926" /></div>
                       <span style={styles.zutrittLabel}>Zutritt</span>
                       <span style={styles.zutrittCode}>{g.accessCode ?? "—"}</span>
                       <div style={styles.zutrittActions}>
@@ -467,13 +516,14 @@ export default function Groups({ navigate }: GroupsProps): React.ReactElement {
                               disabled={isRegenerating}
                               title="Neuen Code generieren"
                             >
-                              <RefreshCw size={13} color={regenConfirmId === g.id ? "#FF7648" : "var(--c-text-3)"}
+                              <RefreshCw size={13} color={regenConfirmId === g.id ? "#2C2926" : "var(--c-text-3)"}
                                 style={{ animation: isRegenerating ? "spin 0.8s linear infinite" : "none" }} />
                             </button>
                           </>
                         )}
                       </div>
                     </div>}
+
                   </>
                 )}
               </div>
@@ -491,22 +541,22 @@ const styles: Record<string, CSSProperties> = {
   title: { fontSize: 28, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
   subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4, marginBottom: 12 },
   topBtns: { display: "flex", gap: 8, alignItems: "center" },
-  joinBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-accent-bg)", color: "#FF7648", border: "1.5px solid #FF7648", borderRadius: 10, padding: "7px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const },
+  joinBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-dark-btn)", color: "var(--c-dark-btn-text)", border: "none", borderRadius: 10, padding: "7px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const },
   newBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-dark-btn)", color: "var(--c-dark-btn-text)", border: "none", borderRadius: 10, padding: "7px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const },
-  createCard: { background: "var(--c-surface)", borderRadius: 16, padding: 16, marginBottom: 16, boxShadow: "var(--neu-raised)" },
+  createCard: { background: "var(--c-surface)", borderRadius: 16, padding: 16, marginBottom: 16 },
   createInput: { width: "100%", border: "1px solid var(--c-border)", borderRadius: 10, padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" as const, background: "var(--c-bg)", color: "var(--c-text-1)" },
   stepBtn: { width: 28, height: 28, borderRadius: 8, border: "1.5px solid var(--c-border)", background: "var(--c-surface-2)", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--c-text-1)" },
   codeToggle: { display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", cursor: "pointer", width: "100%", padding: "10px 2px 2px" },
   codeToggleLabel: { fontSize: 13, fontWeight: 600, color: "var(--c-text-2)" },
   toggle2: { width: 42, height: 24, borderRadius: 12, position: "relative" as const, transition: "background 0.2s", flexShrink: 0 },
-  toggleThumb2: { position: "absolute" as const, top: 3, left: 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "transform 0.2s" },
+  toggleThumb2: { position: "absolute" as const, top: 3, left: 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "transform 0.2s" },
   createActions: { display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" },
   cancelBtn: { background: "var(--c-surface-2)", border: "none", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--c-text-2)" },
-  saveBtn: { background: "#FF7648", border: "none", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff" },
+  saveBtn: { background: "#2C2926", border: "none", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff" },
   emptyState: { textAlign: "center" as const, padding: "60px 20px", display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 12 },
   emptyText: { fontSize: 14, color: "var(--c-text-3)", maxWidth: 240 },
   list: { display: "flex", flexDirection: "column" as const, gap: 10 },
-  listCard: { background: "var(--c-surface)", borderRadius: 16, boxShadow: "var(--neu-raised-sm)", overflow: "hidden" },
+  listCard: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden" },
   listRow: { display: "flex", alignItems: "center" },
   listMain: { flex: 1, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left" as const },
   listIcon: { width: 38, height: 38, borderRadius: 10, background: "var(--c-accent-bg)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
@@ -519,16 +569,16 @@ const styles: Record<string, CSSProperties> = {
   zutrittCode: { fontSize: 18, fontWeight: 800, color: "var(--c-text-1)", letterSpacing: "0.18em", fontFamily: "ui-monospace,'SF Mono',monospace", flex: 1 },
   zutrittActions: { display: "flex", gap: 2 },
   zutrittBtn: { background: "none", border: "none", cursor: "pointer", padding: 5, display: "flex", alignItems: "center", borderRadius: 6 },
-  regenHint: { fontSize: 10, fontWeight: 700, color: "#FF7648", whiteSpace: "nowrap" as const },
+  regenHint: { fontSize: 10, fontWeight: 700, color: "#2C2926", whiteSpace: "nowrap" as const },
   iconBtn: { background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex", alignItems: "center" },
   editCard: { background: "var(--c-surface)", borderRadius: 16, padding: 14 },
-  editInput: { width: "100%", border: "1px solid #FF7648", borderRadius: 8, padding: "8px 12px", fontSize: 14, outline: "none", background: "var(--c-bg)", color: "var(--c-text-1)", boxSizing: "border-box" as const },
+  editInput: { width: "100%", border: "1px solid #2C2926", borderRadius: 8, padding: "8px 12px", fontSize: 14, outline: "none", background: "var(--c-bg)", color: "var(--c-text-1)", boxSizing: "border-box" as const },
   editActions: { display: "flex", gap: 8, marginTop: 10 },
   editSaveBtn:   { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "#22c55e", border: "none", borderRadius: 10, padding: "10px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer" },
   editCancelBtn: { flex: 1, background: "var(--c-surface-2)", border: "none", borderRadius: 10, padding: "10px 0", fontSize: 13, fontWeight: 600, color: "var(--c-text-2)", cursor: "pointer" },
   editDeleteBtn: { width: 40, background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
-  modal: { background: "var(--c-surface)", borderRadius: 20, padding: "28px 24px", width: "100%", maxWidth: 340, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 12, boxShadow: "var(--neu-raised-lg)" },
+  modal: { background: "var(--c-surface)", borderRadius: 20, padding: "28px 24px", width: "100%", maxWidth: 340, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 12 },
   modalIcon: { width: 52, height: 52, background: "#fef3c7", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" },
   modalTitle: { fontSize: 18, fontWeight: 800, color: "#0f172a", margin: 0 },
   modalText: { fontSize: 14, color: "#475569", textAlign: "center" as const, lineHeight: 1.5, margin: 0 },
@@ -537,7 +587,7 @@ const styles: Record<string, CSSProperties> = {
   confirmModalBtn: { flex: 1, background: "#ef4444", border: "none", borderRadius: 12, padding: "12px 0", fontSize: 14, fontWeight: 700, color: "#fff", cursor: "pointer" },
 
   // Join modal
-  joinModal: { background: "var(--c-surface)", borderRadius: 24, padding: "24px 20px", width: "100%", maxWidth: 360, maxHeight: "calc(100dvh - 40px)", overflowY: "auto" as const, display: "flex", flexDirection: "column" as const, gap: 16, boxShadow: "var(--neu-raised-lg)" },
+  joinModal: { background: "var(--c-surface)", borderRadius: 24, padding: "24px 20px", width: "100%", maxWidth: 360, maxHeight: "calc(100dvh - 40px)", overflowY: "auto" as const, display: "flex", flexDirection: "column" as const, gap: 16 },
   joinHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   joinHeaderLeft: { display: "flex", alignItems: "center", gap: 10 },
   joinHeaderIcon: { width: 32, height: 32, background: "var(--c-accent-bg)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" },
@@ -553,13 +603,15 @@ const styles: Record<string, CSSProperties> = {
   cameraVideo: { width: "100%", height: "100%", objectFit: "cover" as const, display: "block" },
   scanFrame: {
     position: "absolute", inset: "20%",
-    border: "2.5px solid #FF7648", borderRadius: 12,
-    boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
+    border: "2.5px solid #2C2926", borderRadius: 12,
   },
   cancelJoinBtn: { background: "var(--c-surface-2)", border: "none", borderRadius: 12, padding: "12px 0", fontSize: 14, fontWeight: 600, color: "var(--c-text-2)", cursor: "pointer", width: "100%" },
   joinLoading: { display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 16, padding: "32px 0" },
-  spinner: { width: 36, height: 36, border: "3px solid var(--c-border)", borderTop: "3px solid #FF7648", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
+  spinner: { width: 36, height: 36, border: "3px solid var(--c-border)", borderTop: "3px solid #2C2926", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
   joinLoadingText: { fontSize: 14, color: "var(--c-text-3)", margin: 0 },
   joinErrorBox: { background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "#dc2626" },
   joinRetryRow: { display: "flex" },
+  folderPicker: { padding: "8px 12px 12px", display: "flex", flexDirection: "column" as const, gap: 4, borderTop: "1px solid var(--c-border-2)" },
+  folderPickerItem: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left" as const },
+  folderPickerCancel: { background: "none", border: "none", fontSize: 12, color: "var(--c-text-3)", cursor: "pointer", padding: "4px 0", textAlign: "left" as const },
 };

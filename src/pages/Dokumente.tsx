@@ -97,6 +97,16 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
   // Image preview
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
+  // Space-verknüpfte Ordner (für alle Mitglieder sichtbar)
+  const [spaceFolders, setSpaceFolders] = useState<(DocFolder & { space_name: string })[]>([]);
+  const [sharedRootId, setSharedRootId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    api.get<(DocFolder & { space_name: string })[]>('/documents/space-folders')
+      .then(setSpaceFolders).catch(() => {});
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
     return subscribeToFolderContents(user.uid, folderId, ({ folders, files }) => {
@@ -137,6 +147,7 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
     setAnimKey((k) => k + 1);
     setFolderId(folder.id);
     setCrumbs((prev) => [...prev, { id: folder.id, name: folder.name }]);
+    if (visibleSpaceFolders.some(sf => sf.id === folder.id)) setSharedRootId(folder.id);
     setEditingFolderId(null);
     setDeleteFolderConfirm(null);
     setDeleteFileConfirm(null);
@@ -249,7 +260,14 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
     }
   };
 
-  const isEmpty = folders.length === 0 && files.length === 0;
+  // Eigene Ordner-IDs — Space-Ordner die der User selbst besitzt nicht doppelt anzeigen
+  const ownFolderIds = new Set(folders.map(f => f.id));
+  const visibleSpaceFolders = folderId === null
+    ? spaceFolders.filter(sf => !ownFolderIds.has(sf.id))
+    : [];
+
+  const isEmpty = folders.length === 0 && files.length === 0 && visibleSpaceFolders.length === 0;
+  const isReadOnly = sharedRootId !== null && crumbs.some(c => c.id === sharedRootId);
 
   return (
     <div style={styles.container}>
@@ -272,23 +290,27 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
       {/* Header */}
       <div style={styles.topRow}>
         <div style={styles.headerBtns}>
-          <button
-            style={styles.outlineBtn}
-            onClick={() => { newFolderActiveRef.current = true; setShowNewFolder(true); setNewFolderName(""); }}
-            title="Neuer Ordner"
-          >
-            <Plus size={15} color="#FF7648" />
-            <span style={styles.btnLabel}>Ordner</span>
-          </button>
-          <button
-            style={styles.solidBtn}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            title="Datei hochladen"
-          >
-            <Upload size={15} color="#fff" />
-            <span style={styles.btnLabelWhite}>Hochladen</span>
-          </button>
+          {!isReadOnly && (
+            <button
+              style={styles.outlineBtn}
+              onClick={() => { newFolderActiveRef.current = true; setShowNewFolder(true); setNewFolderName(""); }}
+              title="Neuer Ordner"
+            >
+              <Plus size={15} color="var(--c-dark-btn-text)" />
+              <span style={styles.btnLabel}>Ordner</span>
+            </button>
+          )}
+          {!isReadOnly && (
+            <button
+              style={styles.solidBtn}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              title="Datei hochladen"
+            >
+              <Upload size={15} color="var(--c-dark-btn-text)" />
+              <span style={styles.btnLabelWhite}>Hochladen</span>
+            </button>
+          )}
           <input
             ref={fileInputRef}
             type="file"
@@ -324,7 +346,7 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
       {/* New folder input */}
       {showNewFolder && (
         <div style={styles.newFolderCard}>
-          <Folder size={17} color="#FF7648" />
+          <Folder size={17} color="#2C2926" />
           <input
             style={styles.newFolderInput}
             placeholder="Ordnername…"
@@ -340,7 +362,7 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
             <X size={14} color="var(--c-text-3)" />
           </button>
           <button style={styles.smallBtn} onClick={handleCreateFolder} disabled={creating}>
-            <Check size={14} color="#FF7648" />
+            <Check size={14} color="#2C2926" />
           </button>
         </div>
       )}
@@ -390,13 +412,35 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
       ) : (
         <div style={styles.list}>
 
+          {/* Lager-verknüpfte Ordner (nur im Root sichtbar, keine eigenen doppelt) */}
+          {visibleSpaceFolders.length > 0 && (
+            <>
+              <div style={styles.sectionLabel}>Lager-Ordner</div>
+              {visibleSpaceFolders.map((sf) => (
+                <div key={sf.id} style={styles.row}>
+                  <button style={styles.rowMain} onClick={() => enterFolder(sf)}>
+                    <div style={{ ...styles.folderIconBox, background: "var(--c-accent-bg)" }}>
+                      <FolderOpen size={19} color="#2C2926" />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column" as const, flex: 1, minWidth: 0 }}>
+                      <span style={styles.rowName}>{sf.name}</span>
+                      <span style={{ fontSize: 11, color: "var(--c-text-3)" }}>{sf.space_name}</span>
+                    </div>
+                    <ChevronRight size={15} color="var(--c-text-4)" style={{ flexShrink: 0 }} />
+                  </button>
+                </div>
+              ))}
+              {(folders.length > 0 || files.length > 0) && <div style={styles.divider} />}
+            </>
+          )}
+
           {/* Folders */}
           {folders.map((folder) => (
             <div key={folder.id} style={styles.row}>
               {editingFolderId === folder.id ? (
                 /* Rename mode */
                 <div style={styles.renameRow}>
-                  <Folder size={17} color="#FF7648" style={{ flexShrink: 0 }} />
+                  <Folder size={17} color="#2C2926" style={{ flexShrink: 0 }} />
                   <input
                     style={styles.renameInput}
                     value={editFolderName}
@@ -419,30 +463,32 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
                 <>
                   <button style={styles.rowMain} onClick={() => enterFolder(folder)}>
                     <div style={styles.folderIconBox}>
-                      <Folder size={19} color="#FF7648" />
+                      <Folder size={19} color="#2C2926" />
                     </div>
                     <span style={styles.rowName}>{folder.name}</span>
                     <ChevronRight size={15} color="var(--c-text-4)" style={{ flexShrink: 0 }} />
                   </button>
-                  <div style={styles.rowActions}>
-                    <button
-                      style={styles.actionBtn}
-                      onClick={() => startRename(folder)}
-                      title="Umbenennen"
-                    >
-                      <Pencil size={14} color="var(--c-text-3)" />
-                    </button>
-                    <button
-                      style={{
-                        ...styles.actionBtn,
-                        background: deleteFolderConfirm === folder.id ? "#fee2e2" : "none",
-                      }}
-                      onClick={() => handleDeleteFolder(folder)}
-                      title="Löschen"
-                    >
-                      <Trash2 size={14} color={deleteFolderConfirm === folder.id ? "#ef4444" : "var(--c-text-4)"} />
-                    </button>
-                  </div>
+                  {!isReadOnly && (
+                    <div style={styles.rowActions}>
+                      <button
+                        style={styles.actionBtn}
+                        onClick={() => startRename(folder)}
+                        title="Umbenennen"
+                      >
+                        <Pencil size={14} color="var(--c-text-3)" />
+                      </button>
+                      <button
+                        style={{
+                          ...styles.actionBtn,
+                          background: deleteFolderConfirm === folder.id ? "#fee2e2" : "none",
+                        }}
+                        onClick={() => handleDeleteFolder(folder)}
+                        title="Löschen"
+                      >
+                        <Trash2 size={14} color={deleteFolderConfirm === folder.id ? "#ef4444" : "var(--c-text-4)"} />
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -468,18 +514,20 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
                   <span style={styles.fileMeta}>{formatSize(file.size)}</span>
                 </div>
               </button>
-              <div style={styles.rowActions}>
-                <button
-                  style={{
-                    ...styles.actionBtn,
-                    background: deleteFileConfirm === file.id ? "#fee2e2" : "none",
-                  }}
-                  onClick={() => handleDeleteFile(file)}
-                  title="Löschen"
-                >
-                  <Trash2 size={14} color={deleteFileConfirm === file.id ? "#ef4444" : "var(--c-text-4)"} />
-                </button>
-              </div>
+              {!isReadOnly && (
+                <div style={styles.rowActions}>
+                  <button
+                    style={{
+                      ...styles.actionBtn,
+                      background: deleteFileConfirm === file.id ? "#fee2e2" : "none",
+                    }}
+                    onClick={() => handleDeleteFile(file)}
+                    title="Löschen"
+                  >
+                    <Trash2 size={14} color={deleteFileConfirm === file.id ? "#ef4444" : "var(--c-text-4)"} />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -508,18 +556,10 @@ const styles: Record<string, CSSProperties> = {
   subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4, marginBottom: 16 },
 
   headerBtns: { display: "flex", gap: 8, marginTop: 6, flexShrink: 0 },
-  outlineBtn: {
-    display: "flex", alignItems: "center", gap: 5,
-    background: "var(--c-accent-bg)", border: "1.5px solid #FF7648",
-    borderRadius: 10, padding: "7px 10px", cursor: "pointer",
-  },
-  solidBtn: {
-    display: "flex", alignItems: "center", gap: 5,
-    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
-    border: "none", borderRadius: 10, padding: "7px 10px", cursor: "pointer",
-  },
-  btnLabel: { fontSize: 12, fontWeight: 600, color: "#FF7648" },
-  btnLabelWhite: { fontSize: 12, fontWeight: 600, color: "#fff" },
+  outlineBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-dark-btn)", border: "none", borderRadius: 10, padding: "7px 10px", cursor: "pointer" },
+  solidBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-dark-btn)", border: "none", borderRadius: 10, padding: "7px 10px", cursor: "pointer" },
+  btnLabel: { fontSize: 12, fontWeight: 600, color: "var(--c-dark-btn-text)" },
+  btnLabelWhite: { fontSize: 12, fontWeight: 600, color: "var(--c-dark-btn-text)" },
 
   breadcrumbs: { display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 12 },
   crumb: { background: "none", border: "none", fontSize: 13, padding: "2px 0" },
@@ -527,8 +567,8 @@ const styles: Record<string, CSSProperties> = {
   newFolderCard: {
     display: "flex", alignItems: "center", gap: 10,
     background: "var(--c-surface)", borderRadius: 14, padding: "11px 14px",
-    marginBottom: 8, boxShadow: "var(--neu-raised)",
-    border: "1.5px solid #FF7648",
+    marginBottom: 8,
+    border: "1.5px solid #2C2926",
   },
   newFolderInput: {
     flex: 1, border: "none", outline: "none", fontSize: 14,
@@ -546,7 +586,7 @@ const styles: Record<string, CSSProperties> = {
   },
   progressFill: {
     position: "absolute", left: 0, top: 0, bottom: 0,
-    background: "linear-gradient(90deg, #FF7648 0%, #e5623a 100%)",
+    background: "linear-gradient(90deg, #2C2926 0%, #2C2926 100%)",
     transition: "width 0.2s ease",
   },
   progressText: {
@@ -573,7 +613,7 @@ const styles: Record<string, CSSProperties> = {
   row: {
     display: "flex", alignItems: "center",
     background: "var(--c-surface)", borderRadius: 14,
-    overflow: "hidden", boxShadow: "var(--neu-raised)",
+    overflow: "hidden",
     minHeight: 56,
   },
   rowMain: {
@@ -605,10 +645,11 @@ const styles: Record<string, CSSProperties> = {
   fileMeta: { fontSize: 11, color: "var(--c-text-3)" },
 
   divider: { height: 1, background: "var(--c-border-2)", margin: "4px 0" },
+  sectionLabel: { fontSize: 11, fontWeight: 700, color: "var(--c-text-3)", letterSpacing: "0.06em", padding: "8px 0 4px", textTransform: "uppercase" as const },
 
   renameRow: {
     flex: 1, display: "flex", alignItems: "center", gap: 10,
-    padding: "10px 14px", border: "1.5px solid #FF7648", borderRadius: 14,
+    padding: "10px 14px", border: "1.5px solid #2C2926", borderRadius: 14,
     background: "var(--c-surface)",
   },
   renameInput: {
@@ -636,7 +677,7 @@ const styles: Record<string, CSSProperties> = {
   },
   previewImg: {
     maxWidth: "100%", maxHeight: "80vh",
-    borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+    borderRadius: 12,
     objectFit: "contain",
   },
 };

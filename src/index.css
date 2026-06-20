@@ -4,28 +4,28 @@
 
 /* ─── CSS-Variablen ─────────────────────────────────────────────────────────── */
 :root {
-  --c-bg:         #F0EFEB;
-  --c-surface:    #ffffff;
-  --c-surface-2:  #f0efeb;
-  --c-surface-3:  #ffffff;
-  --c-text-1:     #202020;
-  --c-text-2:     #4a4a4a;
-  --c-text-3:     #8a8a8a;
-  --c-text-4:     #b0b0b0;
-  --c-border:     #dddbd6;
-  --c-border-2:   #e8e6e1;
-  --c-accent-bg:  #fde8df;
-  --c-dark-btn:   #2d3a52;
-  --c-dark-btn-text: #ffffff;
-  --c-brand:      #FF7648;
-  --c-brand-dark: #e5623a;
+  --c-bg:         #E0DBD4;
+  --c-surface:    #FFFFFF;
+  --c-surface-2:  #F2F2F2;
+  --c-surface-3:  #FFFFFF;
+  --c-text-1:     #534D41;
+  --c-text-2:     #6B6459;
+  --c-text-3:     #8C8479;
+  --c-text-4:     #ADA59C;
+  --c-border:     #C2BBB0;
+  --c-border-2:   #EBEBEB;
+  --c-accent-bg:  #F5A030;
+  --c-dark-btn:   #534D41;
+  --c-dark-btn-text: #FFFFFF;
+  --c-brand:      #2C2926;
+  --c-brand-dark: #2C2926;
 
   /* Neumorphic shadows */
-  --neu-raised:    6px 6px 14px rgba(190,185,175,0.5), -6px -6px 14px rgba(255,255,255,0.9);
-  --neu-raised-sm: 3px 3px 7px  rgba(190,185,175,0.4), -3px -3px 7px  rgba(255,255,255,0.85);
-  --neu-raised-lg: 10px 10px 22px rgba(190,185,175,0.55),-10px -10px 22px rgba(255,255,255,0.95);
-  --neu-inset:     inset 4px 4px 9px rgba(190,185,175,0.45), inset -4px -4px 9px rgba(255,255,255,0.8);
-  --neu-inset-sm:  inset 2px 2px 5px rgba(190,185,175,0.4), inset -2px -2px 5px rgba(255,255,255,0.75);
+  --neu-raised:    none;
+  --neu-raised-sm: none;
+  --neu-raised-lg: none;
+  --neu-inset:     none;
+  --neu-inset-sm:  none;
 }
 
 .dark body,
@@ -48,8 +48,8 @@
   --c-accent-bg:  #431407;
   --c-dark-btn:   #f1f5f9;
   --c-dark-btn-text: #0f172a;
-  --c-brand:      #FF7648;
-  --c-brand-dark: #e5623a;
+  --c-brand:      #2C2926;
+  --c-brand-dark: #2C2926;
 }
 
 /* ─── Animationen ────────────────────────────────────────────────────────────── */
@@ -87,15 +87,15 @@
   html {
     overflow: hidden;
     height: 100%;
+    background-color: var(--c-bg);
   }
 
   body {
-    height: 100%;
+    height: 100dvh;
     overscroll-behavior: none;
     background-color: var(--c-bg);
-    background-image: radial-gradient(ellipse at 20% 0%, rgba(255,118,72,0.08) 0%, transparent 60%),
-                      radial-gradient(ellipse at 80% 100%, rgba(99,102,241,0.07) 0%, transparent 55%);
-    font-family: 'Inter', 'Helvetica Neue', sans-serif;
+    background-image: none;
+    font-family: 'Roboto', 'Helvetica Neue', sans-serif;
     @apply text-slate-900 antialiased;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -106,28 +106,27 @@
 .app-shell {
   display: flex;
   flex-direction: column;
-  height: 100vh;                   /* Fallback */
-  height: -webkit-fill-available;  /* iOS Safari — stable, doesn't shrink with keyboard */
-  height: 100svh;                  /* Small viewport height — fixed, keyboard doesn't move it */
-  max-width: 500px;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   margin: 0 auto;
-  overflow: hidden;
+  width: 100%;
+  max-width: 500px;
+  overflow: clip;
   background-color: var(--c-bg);
-  background-image: radial-gradient(ellipse at 20% 0%, rgba(255,118,72,0.08) 0%, transparent 60%),
-                    radial-gradient(ellipse at 80% 100%, rgba(99,102,241,0.07) 0%, transparent 55%);
-  background-attachment: fixed;
-  position: relative;
+  background-image: none;
 }
 
 
 /* Desktop: gray background + shadow around the app column */
 @media (min-width: 501px) {
   body {
-    background: #d1d5db;
-    background-image: radial-gradient(circle at 60% 20%, #f3f4f6 0%, #d1d5db 100%);
+    background: #A8A099;
   }
   .app-shell {
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 20px 60px rgba(0,0,0,0.25);
+    
   }
 }
 
@@ -145,8 +144,8 @@ input, textarea {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 input:focus, textarea:focus {
-  border-color: #FF7648 !important;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15) !important;
+  border-color: #2C2926 !important;
+  
   outline: none !important;
 }
 .search-input:focus {
@@ -183,7 +182,7 @@ input:focus, textarea:focus {
 }
 .header-pill.header-pill-expanded {
   border-radius: 22px;
-  background: rgba(15, 23, 42, 0.88);
+  background: #534D41;
   /* Expand: background first, then width + border-radius */
   transition: width 0.38s cubic-bezier(0.4, 0, 0.2, 1) 0.05s,
               border-radius 0.38s cubic-bezier(0.4, 0, 0.2, 1),

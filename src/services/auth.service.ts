@@ -24,6 +24,7 @@ export async function loginWithGoogle(idToken: string): Promise<void> {
 
 export async function logoutUser(): Promise<void> {
   clearToken();
+  localStorage.removeItem("kistle_gate");
   window.location.reload();
 }
 

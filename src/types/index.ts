@@ -20,6 +20,8 @@ export interface Space {
   color: string;
   isGroup: boolean;
   accessCode?: string;
+  folderId?: string | null;
+  boxNumber?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }

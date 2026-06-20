@@ -10,9 +10,9 @@ import Cart from "./pages/Cart";
 import SearchPage from "./pages/SearchPage";
 import Settings from "./pages/Settings";
 import AccountSettings from "./pages/AccountSettings";
-import Erweiterungen from "./pages/Erweiterungen";
-import NukiSettings from "./pages/NukiSettings";
+
 import LoginPage from "./pages/LoginPage";
+import WelcomePage from "./pages/WelcomePage";
 import UnboxedDetail from "./pages/UnboxedDetail";
 import ItemView from "./pages/ItemView";
 import { useAuth } from "./contexts/AuthContext";
@@ -28,8 +28,6 @@ export type PageName =
   | "SearchPage"
   | "Settings"
   | "AccountSettings"
-  | "Erweiterungen"
-  | "NukiSettings"
   | "ProductDetail"
   | "ItemView";
 
@@ -47,8 +45,6 @@ const PAGE_DEPTH: Record<PageName, number> = {
   Settings:        1,
   GroupDetail:     2,
   AccountSettings:  2,
-  Erweiterungen:    2,
-  NukiSettings:     3,
   UnboxedDetail:   3,
   BoxDetail:       3,
   ProductDetail:   4,
@@ -76,6 +72,7 @@ function getInitialPage(): PageName {
 
 export default function App(): React.ReactElement {
   const { user, loading } = useAuth();
+  const [gatePassed, setGatePassed] = useState(() => localStorage.getItem("kistle_gate") === "1");
   const [currentPage, setCurrentPage] = useState<PageName>(getInitialPage);
   const [pageParams, setPageParams]   = useState<PageParams>({});
   const [navDir, setNavDir]           = useState<NavDirection>("lateral");
@@ -149,6 +146,7 @@ export default function App(): React.ReactElement {
     );
   }
 
+  if (!gatePassed) return <WelcomePage onSuccess={() => { localStorage.setItem("kistle_gate", "1"); setGatePassed(true); }} />;
   if (!user) return <LoginPage />;
 
   const navigate: NavigateFn = (page, params = {}) => {
@@ -177,8 +175,6 @@ export default function App(): React.ReactElement {
       case "SearchPage":  return <SearchPage navigate={navigate} />;
       case "Settings":         return <Settings navigate={navigate} />;
       case "AccountSettings":  return <AccountSettings navigate={navigate} />;
-      case "Erweiterungen":    return <Erweiterungen navigate={navigate} />;
-      case "NukiSettings":     return <NukiSettings navigate={navigate} />;
       case "ProductDetail":    return <ProductDetail navigate={navigate} params={pageParams} />;
       case "ItemView":         return <ItemView navigate={navigate} params={pageParams} />;
       default:            return <Groups navigate={navigate} />;
@@ -203,7 +199,7 @@ export default function App(): React.ReactElement {
 
 const updateBannerStyle: CSSProperties = {
   position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999,
-  background: "#FF7648", color: "#fff",
+  background: "#2C2926", color: "#fff",
   padding: "10px 16px",
   paddingTop: "calc(10px + env(safe-area-inset-top))",
   textAlign: "center", fontSize: 13, fontWeight: 600,
@@ -215,7 +211,7 @@ const spinnerStyles: Record<string, CSSProperties> = {
   spinner: {
     width: 40, height: 40,
     border: "3px solid #e2e8f0",
-    borderTopColor: "#FF7648",
+    borderTopColor: "#2C2926",
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },

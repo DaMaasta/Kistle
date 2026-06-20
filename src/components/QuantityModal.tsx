@@ -96,7 +96,7 @@ export default function QuantityModal({ product, initialQty, onConfirm, onClose 
         </div>
 
         <button
-          style={{ ...styles.confirmBtn, background: confirmed ? "#16a34a" : "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)", boxShadow: confirmed ? "0 4px 14px rgba(22,163,74,0.35)" : "0 4px 14px rgba(255,118,72,0.35)", transition: "background 0.2s, box-shadow 0.2s" }}
+          style={{ ...styles.confirmBtn, background: confirmed ? "#16a34a" : "#2C2926", transition: "background 0.2s" }}
           onClick={() => !confirmed && handleConfirm(qty)}
         >
           <ShoppingCart size={18} color="#fff" />
@@ -116,13 +116,12 @@ const styles: Record<string, CSSProperties> = {
   },
   sheet: {
     background: "var(--c-surface)", borderRadius: "24px 24px 0 0",
-    padding: "12px 24px calc(env(safe-area-inset-bottom) + 90px)", width: "100%", maxWidth: 430,
-    display: "flex", flexDirection: "column", gap: 24,
-    boxShadow: "0 -4px 24px rgba(163,177,198,0.45)",
+    padding: "12px 24px", paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)", width: "100%", maxWidth: 430,
+    display: "flex", flexDirection: "column", gap: 20,
   },
   handle: { width: 40, height: 4, borderRadius: 2, background: "var(--c-border)", margin: "0 auto" },
   header: { display: "flex", alignItems: "center", gap: 14 },
-  productImg: { width: 52, height: 52, borderRadius: 14, background: "var(--c-bg)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden", boxShadow: "var(--neu-raised-sm)" },
+  productImg: { width: 52, height: 52, borderRadius: 14, background: "var(--c-bg)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" },
   productImgEl: { width: "100%", height: "100%", objectFit: "cover" },
   productInitial: { fontSize: 22, fontWeight: 700, color: "var(--c-text-3)" },
   headerInfo: { flex: 1 },
@@ -135,14 +134,12 @@ const styles: Record<string, CSSProperties> = {
     background: "var(--c-bg)", border: "none", cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
     color: "var(--c-text-1)", transition: "opacity 0.15s",
-    boxShadow: "var(--neu-raised-sm)",
   },
   qtyVal: { fontSize: 42, fontWeight: 800, color: "var(--c-text-1)", minWidth: 64, width: 80, textAlign: "center", border: "none", outline: "none", background: "transparent", padding: 0, fontFamily: "inherit" },
   confirmBtn: {
     display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
+    background: "#2C2926",
     color: "#fff", border: "none", borderRadius: 16,
     padding: "16px", fontSize: 16, fontWeight: 700, cursor: "pointer",
-    boxShadow: "0 4px 14px rgba(255,118,72,0.35)",
   },
 };

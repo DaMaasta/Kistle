@@ -131,7 +131,7 @@ export default function Cart({ navigate: _navigate }: CartProps): React.ReactEle
                 ? "linear-gradient(135deg, #16a34a 0%, #15803d 100%)"
                 : armed
                 ? "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)"
-                : "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
+                : "#2C2926",
               transition: "background 0.25s",
             }}
             onClick={handleButtonClick}
@@ -152,7 +152,7 @@ const styles: Record<string, CSSProperties> = {
   subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4, marginBottom: 20 },
   empty: { textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: "70dvh" },
   emptyText: { fontSize: 15, fontWeight: 600, color: "var(--c-text-2)" },
-  list: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--neu-raised-sm)", marginBottom: 16 },
+  list: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", marginBottom: 16 },
   item: { display: "flex", alignItems: "center", gap: 12, padding: "12px 14px" },
   itemImg: { width: 48, height: 48, borderRadius: 10, background: "var(--c-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" },
   itemImgEl: { width: "100%", height: "100%", objectFit: "cover" },
@@ -173,9 +173,9 @@ const styles: Record<string, CSSProperties> = {
   errorBox: { display: "flex", alignItems: "center", gap: 8, background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#991b1b", marginBottom: 10 },
   abbuchenBtn: {
     width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
+    background: "#2C2926",
     color: "#fff", border: "none", borderRadius: 14,
     padding: "15px", fontSize: 16, fontWeight: 700,
-    cursor: "pointer", boxShadow: "0 4px 14px rgba(255,118,72,0.35)",
+    cursor: "pointer",
   },
 };

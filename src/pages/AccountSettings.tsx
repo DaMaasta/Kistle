@@ -212,11 +212,11 @@ function PasswordInput({ label, value, onChange, show, onToggle }: PasswordInput
 const styles: Record<string, CSSProperties> = {
   container: { padding: "16px" },
   back:      { display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", marginBottom: 20 },
-  backText:  { color: "#FF7648", fontSize: 14, fontWeight: 600 },
+  backText:  { color: "#2C2926", fontSize: 14, fontWeight: 600 },
   title:     { fontSize: 26, fontWeight: 800, color: "var(--c-text-1)", margin: "0 0 2px" },
   subtitle:  { fontSize: 13, color: "var(--c-text-3)", marginBottom: 24 },
   sectionLabel: { fontSize: 11, fontWeight: 700, color: "var(--c-text-3)", letterSpacing: "0.08em", marginBottom: 8 },
-  card: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", marginBottom: 12 },
+  card: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", marginBottom: 12 },
   divider: { height: 1, background: "var(--c-border-2)", marginLeft: 16 },
   field: { display: "flex", flexDirection: "column", gap: 4, padding: "12px 16px" },
   fieldLabel: { fontSize: 11, fontWeight: 700, color: "var(--c-text-3)", textTransform: "uppercase", letterSpacing: "0.05em" },
@@ -225,7 +225,7 @@ const styles: Record<string, CSSProperties> = {
   eyeBtn: { background: "none", border: "none", cursor: "pointer", padding: 10, display: "flex", alignItems: "center", flexShrink: 0, minWidth: 44, minHeight: 44, justifyContent: "center" },
   saveBtn: {
     width: "100%", padding: "14px", border: "none", borderRadius: 14,
-    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
+    background: "#2C2926",
     color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 8,
   },
   errorBox:   { background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#991b1b", marginBottom: 10 },

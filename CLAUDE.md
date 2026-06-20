@@ -9,8 +9,8 @@ Inventar- und Lagerverwaltungs-PWA (React/TypeScript). Nutzer verwalten hierarch
 
 | | |
 |---|---|
-| **IP** | `192.168.0.71` |
-| **SSH** | `ssh damaasta@192.168.0.71` |
+| **IP** | `10.10.30.167` (WLAN, neuer Standort) |
+| **SSH** | `ssh damaasta@ssh.kistle.uk` (via Cloudflare Tunnel) |
 | **OS** | Ubuntu Server + Docker |
 | **Domain** | `https://kistle.uk` via Cloudflare Tunnel |
 

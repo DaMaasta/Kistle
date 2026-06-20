@@ -184,7 +184,7 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
           <p style={styles.emptyText}>Die Box ist leer</p>
           {!isViewer && (
             <button style={styles.emptyBtn} onClick={() => setShowForm(true)}>
-              <Plus size={14} color="#FF7648" /> Ersten Gegenstand hinzufügen
+              <Plus size={14} color="#2C2926" /> Ersten Gegenstand hinzufügen
             </button>
           )}
         </div>
@@ -214,7 +214,7 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
                   </div>
                   {!isViewer && (
                     <button
-                      style={{ ...styles.cartBtn, opacity: p.quantity === 0 ? 0.35 : 1, background: inCart ? "#c2410c" : "#FF7648" }}
+                      style={{ ...styles.cartBtn, opacity: p.quantity === 0 ? 0.35 : 1, background: inCart ? "#c2410c" : "#2C2926" }}
                       onClick={(e) => { e.stopPropagation(); setModalProduct(p); }}
                       disabled={p.quantity === 0}
                       title="Zum Warenkorb hinzufügen"
@@ -258,12 +258,12 @@ const styles: Record<string, CSSProperties> = {
   container: { padding: "16px" },
   back:     { display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", marginBottom: 16 },
   viewerBanner: { background: "var(--c-surface-2)", borderRadius: 10, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "var(--c-text-3)", marginBottom: 12, textAlign: "center" as const },
-  backText: { color: "#FF7648", fontSize: 14, fontWeight: 600 },
+  backText: { color: "#2C2926", fontSize: 14, fontWeight: 600 },
   header:   { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
   title:    { fontSize: 26, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
   subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4 },
   newBtn:   { display: "flex", alignItems: "center", gap: 6, background: "var(--c-dark-btn)", color: "var(--c-dark-btn-text)", border: "none", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" },
-  formCard: { background: "var(--c-surface)", borderRadius: 20, padding: 20, marginBottom: 20, boxShadow: "var(--neu-raised)", display: "flex", flexDirection: "column", gap: 14 },
+  formCard: { background: "var(--c-surface)", borderRadius: 20, padding: 20, marginBottom: 20, display: "flex", flexDirection: "column", gap: 14 },
   formHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   formTitle:  { fontSize: 16, fontWeight: 700, color: "var(--c-text-1)" },
   closeBtn:   { background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", minWidth: 40, minHeight: 40, alignItems: "center", justifyContent: "center" },
@@ -278,12 +278,12 @@ const styles: Record<string, CSSProperties> = {
   qtyBtn: { background: "var(--c-border)", border: "none", borderRadius: 8, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   qtyVal: { fontSize: 16, fontWeight: 700, color: "var(--c-text-1)", minWidth: 24, width: 40, textAlign: "center", border: "none", outline: "none", background: "transparent", padding: 0, fontFamily: "inherit" },
   select: { border: "1px solid var(--c-border)", borderRadius: 10, padding: "10px 12px", fontSize: 14, outline: "none", background: "var(--c-bg)", color: "var(--c-text-1)" },
-  saveBtn: { background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer" },
+  saveBtn: { background: "#2C2926", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer" },
   emptyState: { textAlign: "center", padding: "60px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
   emptyText:  { fontSize: 14, color: "var(--c-text-3)" },
-  emptyBtn:   { display: "flex", alignItems: "center", gap: 6, background: "var(--c-accent-bg)", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#FF7648", cursor: "pointer" },
+  emptyBtn:   { display: "flex", alignItems: "center", gap: 6, background: "var(--c-accent-bg)", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2C2926", cursor: "pointer" },
   list: { display: "flex", flexDirection: "column", gap: 8 },
-  card: { background: "var(--c-surface)", borderRadius: 16, boxShadow: "var(--neu-raised-sm)", overflow: "hidden", cursor: "pointer" },
+  card: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", cursor: "pointer" },
   item: { display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" },
   itemImg:    { width: 64, height: 64, borderRadius: 12, background: "var(--c-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" },
   itemImgEl:  { width: "100%", height: "100%", objectFit: "cover" },

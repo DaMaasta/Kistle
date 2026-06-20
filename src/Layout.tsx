@@ -60,6 +60,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [currentPageName]);
 
+
   useEffect(() => {
     const activeIdx = navItems.findIndex(item =>
       currentPageName === item.page ||
@@ -103,7 +104,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
 
   const unreadCount = notifications.length;
 
-  const mainOverflow = currentPageName === "Settings" ? "hidden" : "auto";
+  const mainOverflow = (currentPageName === "Settings" || currentPageName === "ProductDetail" || currentPageName === "ItemView") ? "hidden" : "auto";
 
   return (
     <div className="app-shell">
@@ -131,7 +132,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
             <div ref={pillTitleRef} className="header-pill-title-slot">
               {headerState?.onBack && (
                 <button style={styles.headerBackBtn} onClick={headerState.onBack}>
-                  <ChevronLeft size={20} color="#FF7648" />
+                  <ChevronLeft size={20} color="#ffffff" />
                 </button>
               )}
               <span style={styles.headerTitle}>{headerState?.title ?? ""}</span>
@@ -152,7 +153,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
               }}
               aria-label="Benachrichtigungen"
             >
-              <Bell size={20} color={unreadCount > 0 ? "#FF7648" : "var(--c-text-3)"} />
+              <Bell size={20} color={unreadCount > 0 ? "#2C2926" : "var(--c-text-3)"} />
               {unreadCount > 0 && (
                 <span style={styles.bellBadge}>{unreadCount > 9 ? "9+" : unreadCount}</span>
               )}
@@ -198,10 +199,14 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
       </header>
 
       {/* Content */}
-      <main ref={mainRef} style={{ ...styles.main, overflowY: mainOverflow }}>{children}</main>
+      <main ref={mainRef} style={{ ...styles.main, overflowY: mainOverflow }}>
+        {children}
+        <div style={{ height: "calc(env(safe-area-inset-bottom) + 80px)", flexShrink: 0, pointerEvents: "none" }} />
+      </main>
 
       {/* Bottom Nav */}
       <nav style={styles.navOuter} className="app-nav">
+
         <div style={styles.navPill}>
           {indicatorLeft !== null && (
             <div style={{ ...styles.navIndicator, left: indicatorLeft }} />
@@ -220,7 +225,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
                   style={styles.navItem}
                 >
                   <div style={{ position: "relative" }}>
-                    <Icon size={20} color={isActive ? "#FF7648" : "var(--c-text-3)"} />
+                    <Icon size={20} color={isActive ? "#2C2926" : "var(--c-text-3)"} />
                     {cartCount > 0 && <span style={styles.badge} />}
                   </div>
                 </button>
@@ -234,7 +239,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
                 onClick={() => navigate(item.page)}
                 style={styles.navItem}
               >
-                <Icon size={20} color={isActive ? "#FF7648" : "var(--c-text-3)"} />
+                <Icon size={20} color={isActive ? "#2C2926" : "var(--c-text-3)"} />
               </button>
             );
           })}
@@ -249,17 +254,16 @@ const styles: Record<string, CSSProperties> = {
     display: "flex", alignItems: "center", justifyContent: "space-between",
     padding: "10px 16px",
     paddingTop: "max(10px, env(safe-area-inset-top))",
-    background: "#ffffff",
+    background: "var(--c-surface)",
     flexShrink: 0,
     position: "relative",
     zIndex: 100,
-    boxShadow: "0 2px 12px rgba(180,168,155,0.25)",
   },
   headerLeft: { display: "flex", alignItems: "center", flex: 1, minWidth: 0 },
   avatarImg: { width: 44, height: 44, borderRadius: "50%", display: "block", objectFit: "cover" },
   avatarInitials: {
     width: 44, height: 44, borderRadius: "50%",
-    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
+    background: "#534D41",
     color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
     fontSize: 15, fontWeight: 700, flexShrink: 0,
   },
@@ -274,9 +278,9 @@ const styles: Record<string, CSSProperties> = {
   headerRight: { display: "flex", alignItems: "center", gap: 10 },
   bellWrapper: { position: "relative" },
   bellBtn: {
-    position: "relative", background: "#ffffff", border: "none", cursor: "pointer",
+    position: "relative", background: "var(--c-surface)", border: "none", cursor: "pointer",
     width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center",
-    borderRadius: "50%", boxShadow: "var(--neu-raised-sm)",
+    borderRadius: "50%",
   },
   bellBadge: {
     position: "absolute", top: 4, right: 4,
@@ -290,7 +294,7 @@ const styles: Record<string, CSSProperties> = {
     position: "fixed", top: 80, left: "50%", transform: "translateX(-50%)",
     width: "calc(100% - 32px)", maxWidth: 420,
     background: "var(--c-surface)",
-    borderRadius: 16, boxShadow: "var(--neu-raised)",
+    borderRadius: 16,
     zIndex: 200, overflow: "hidden",
   },
   notifHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px 10px", borderBottom: "1px solid var(--c-border-2)" },
@@ -303,57 +307,63 @@ const styles: Record<string, CSSProperties> = {
     padding: "12px 16px", background: "none", border: "none", cursor: "pointer",
     textAlign: "left", borderBottom: "1px solid var(--c-border-2)",
   },
-  notifDot: { width: 8, height: 8, borderRadius: "50%", background: "#FF7648", marginTop: 4, flexShrink: 0 },
+  notifDot: { width: 8, height: 8, borderRadius: "50%", background: "#2C2926", marginTop: 4, flexShrink: 0 },
   notifBody: { display: "flex", flexDirection: "column", gap: 2, flex: 1 },
   notifMsg: { fontSize: 13, color: "var(--c-text-1)", lineHeight: 1.4 },
   notifTime: { fontSize: 11, color: "var(--c-text-3)" },
   markReadBtn: {
     width: "100%", background: "none", border: "none", cursor: "pointer",
-    padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#FF7648", textAlign: "center",
+    padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#2C2926", textAlign: "center",
   },
   avatar: {
     width: 44, height: 44, borderRadius: "50%",
-    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
+    background: "#2C2926",
     color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
     fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer",
-    boxShadow: "0 2px 8px rgba(255,118,72,0.25)",
   },
-  main: { flex: 1, minHeight: 0, overflowX: "hidden", paddingBottom: 16, overscrollBehavior: "none" },
+  main: { flex: 1, minHeight: 0, overflowX: "hidden", overscrollBehavior: "none" },
   navOuter: {
-    flexShrink: 0,
-    padding: "6px 32px",
-    paddingBottom: "calc(env(safe-area-inset-bottom) + 4px)",
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxWidth: 500,
+    margin: "0 auto",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-end",
+    padding: "0 32px",
+    paddingBottom: "42px",
     zIndex: 50,
-    background: "transparent",
+    background: "linear-gradient(to bottom, transparent 0%, var(--c-bg) 55%)",
   },
   navPill: {
     position: "relative",
     display: "flex", alignItems: "center", justifyContent: "space-around",
-    background: "#ffffff",
+    background: "var(--c-surface)",
     borderRadius: 40,
     padding: "4px 10px",
     boxShadow: "0 4px 20px rgba(0,0,0,0.10)",
   },
   navIndicator: {
-    position: "absolute",
+    position: "absolute" as const,
     top: "50%",
     transform: "translateY(-50%)",
-    width: 42, height: 42,
+    width: 52, height: 52,
     borderRadius: "50%",
     background: "var(--c-bg)",
-    boxShadow: "var(--neu-inset)",
     transition: "left 0.38s cubic-bezier(0.34, 1.3, 0.64, 1)",
-    pointerEvents: "none",
+    pointerEvents: "none" as const,
     zIndex: 0,
   },
   navItem: {
-    width: 42, height: 42,
+    width: 52, height: 52,
     display: "flex", alignItems: "center", justifyContent: "center",
     borderRadius: "50%",
     background: "transparent",
     border: "none", cursor: "pointer",
     flexShrink: 0, padding: 0,
-    position: "relative", zIndex: 1,
+    position: "relative" as const, zIndex: 1,
   },
   navItemActive: {},
   navCartBtn: {
@@ -363,7 +373,7 @@ const styles: Record<string, CSSProperties> = {
   },
   navCartInner: {
     width: 50, height: 50, borderRadius: "50%",
-    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
+    background: "#2C2926",
     display: "flex", alignItems: "center", justifyContent: "center",
     position: "relative",
   },

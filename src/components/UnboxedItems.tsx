@@ -191,7 +191,7 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
           <Package size={40} color="var(--c-border)" />
           <p style={styles.emptyText}>Noch keine Gegenstände hier</p>
           <button style={styles.emptyBtn} onClick={() => setShowForm(true)}>
-            <Plus size={14} color="#FF7648" /> Ersten Gegenstand hinzufügen
+            <Plus size={14} color="#2C2926" /> Ersten Gegenstand hinzufügen
           </button>
         </div>
       ) : (
@@ -233,7 +233,7 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
                       <span style={styles.itemQtyNum}>{p.quantity}</span>
                     </div>
                     <button
-                      style={{ ...styles.cartBtn, opacity: p.quantity === 0 ? 0.35 : 1, background: inCart ? "#c2410c" : "#FF7648" }}
+                      style={{ ...styles.cartBtn, opacity: p.quantity === 0 ? 0.35 : 1, background: inCart ? "#c2410c" : "#2C2926" }}
                       onClick={() => setModalProduct(p)}
                       disabled={p.quantity === 0}
                     >
@@ -276,7 +276,7 @@ const styles: Record<string, CSSProperties> = {
   topRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
   count: { fontSize: 13, color: "var(--c-text-3)", fontWeight: 500 },
   addBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-dark-btn)", color: "var(--c-dark-btn-text)", border: "none", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" },
-  formCard: { background: "var(--c-surface)", borderRadius: 20, padding: 20, marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", gap: 14 },
+  formCard: { background: "var(--c-surface)", borderRadius: 20, padding: 20, marginBottom: 16, display: "flex", flexDirection: "column", gap: 14 },
   formHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   formTitle: { fontSize: 16, fontWeight: 700, color: "var(--c-text-1)" },
   closeBtn: { background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex" },
@@ -291,12 +291,12 @@ const styles: Record<string, CSSProperties> = {
   qtyBtn: { background: "var(--c-border)", border: "none", borderRadius: 6, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   qtyVal: { fontSize: 16, fontWeight: 700, color: "var(--c-text-1)", minWidth: 24, textAlign: "center" },
   select: { border: "1px solid var(--c-border)", borderRadius: 10, padding: "10px 12px", fontSize: 14, outline: "none", background: "var(--c-bg)", color: "var(--c-text-1)" },
-  saveBtn: { background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)", color: "#fff", border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer" },
+  saveBtn: { background: "#2C2926", color: "#fff", border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer" },
   emptyState: { textAlign: "center", padding: "40px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
   emptyText: { fontSize: 14, color: "var(--c-text-3)" },
-  emptyBtn: { display: "flex", alignItems: "center", gap: 6, background: "var(--c-accent-bg)", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#FF7648", cursor: "pointer" },
+  emptyBtn: { display: "flex", alignItems: "center", gap: 6, background: "var(--c-accent-bg)", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2C2926", cursor: "pointer" },
   list: { display: "flex", flexDirection: "column", gap: 10 },
-  card: { background: "var(--c-surface)", borderRadius: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", overflow: "hidden" },
+  card: { background: "var(--c-surface)", borderRadius: 20, overflow: "hidden" },
   item: { display: "flex", alignItems: "center", gap: 14, padding: "14px 16px" },
   itemImg: { width: 52, height: 52, borderRadius: 14, background: "var(--c-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" },
   itemImgEl: { width: "100%", height: "100%", objectFit: "cover" },

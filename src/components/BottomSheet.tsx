@@ -54,7 +54,6 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: "24px 24px 0 0",
     padding: "12px 20px calc(env(safe-area-inset-bottom) + 24px)",
     width: "100%",
-    boxShadow: "0 -4px 24px rgba(0,0,0,0.18)",
     display: "flex", flexDirection: "column", gap: 16,
     maxHeight: "90dvh", overflowY: "auto",
   },

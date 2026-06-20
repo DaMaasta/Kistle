@@ -14,7 +14,7 @@ import { getInitials, formatLocation } from "../utils/stringUtils";
 
 type Tab = "Boxen" | "Mitglieder" | "Verlauf";
 
-const BOX_COLORS = ["#FF7648","#ef4444","#eab308","#22c55e","#14b8a6","#3b82f6","#8b5cf6","#ec4899"];
+const BOX_COLORS = ["#2C2926","#ef4444","#eab308","#22c55e","#14b8a6","#3b82f6","#8b5cf6","#ec4899"];
 
 interface GroupDetailProps {
   navigate: NavigateFn;
@@ -44,8 +44,9 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [editName, setEditName]     = useState("");
   const [editDesc, setEditDesc]     = useState("");
-  const [editColor, setEditColor]   = useState("#FF7648");
-  const [newColor, setNewColor]     = useState("#FF7648");
+  const [editColor, setEditColor]   = useState("#2C2926");
+  const [editNumber, setEditNumber] = useState<number | null>(null);
+  const [newColor, setNewColor]     = useState("#2C2926");
   const [deleteBox, setDeleteBox]   = useState<{ id: string; name: string } | null>(null);
   const [historyFilter, setHistoryFilter] = useState("");
   const [unboxedCount, setUnboxedCount] = useState(0);
@@ -69,6 +70,8 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
   const returnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const inviteInputRef = useRef<HTMLInputElement>(null);
+  const autoAssignedRef = useRef(false);
+
   const tabs: Tab[] = ["Boxen", "Mitglieder", "Verlauf"];
 
   useEffect(() => {
@@ -116,6 +119,19 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
     if (!initialGroup?.id) return;
     return subscribeToSpaceProducts(initialGroup.id, (products) => setUnboxedCount(products.length));
   }, [initialGroup?.id]);
+
+  // Auto-assign box_number to boxes that have none yet
+  useEffect(() => {
+    if (autoAssignedRef.current || boxes.length === 0) return;
+    const withoutNum = boxes.filter(b => b.boxNumber == null);
+    if (withoutNum.length === 0) return;
+    autoAssignedRef.current = true;
+    const maxNum = boxes.reduce((m, b) => b.boxNumber != null && b.boxNumber > m ? b.boxNumber : m, 0);
+    const sorted = [...withoutNum].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    sorted.forEach((box, idx) => {
+      updateSpace(box.id, { boxNumber: maxNum + idx + 1 });
+    });
+  }, [boxes]);
 
   const members: SpaceMember[] = Object.values(group?.members ?? {});
   const currentMember = members.find((m) => m.userId === user?.uid);
@@ -278,7 +294,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
         name: newName.trim(), type: "box", parentId: group.id,
         description: newDesc.trim(), icon: "📦", color: newColor,
       });
-      setNewName(""); setNewDesc(""); setNewColor("#FF7648"); setShowCreate(false);
+      setNewName(""); setNewDesc(""); setNewColor("#2C2926"); setShowCreate(false);
     } finally { setCreating(false); }
   };
 
@@ -286,13 +302,14 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
     setEditingId(box.id);
     setEditName(box.name);
     setEditDesc(box.description ?? "");
-    setEditColor(box.color ?? "#FF7648");
+    setEditColor(box.color ?? "#2C2926");
+    setEditNumber(box.boxNumber ?? null);
     setDeleteBox(null);
   };
 
   const handleEdit = async () => {
     if (!editName.trim() || !editingId) return;
-    await updateSpace(editingId, { name: editName.trim(), description: editDesc.trim(), color: editColor });
+    await updateSpace(editingId, { name: editName.trim(), description: editDesc.trim(), color: editColor, boxNumber: editNumber });
     setEditingId(null);
   };
 
@@ -310,7 +327,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
         <BottomSheet onClose={() => setShowInvite(false)}>
           <div style={styles.inviteHeader}>
             <div style={styles.inviteHeaderLeft}>
-              <div style={styles.inviteHeaderIcon}><UserPlus size={16} color="#FF7648" /></div>
+              <div style={styles.inviteHeaderIcon}><UserPlus size={16} color="#2C2926" /></div>
               <span style={styles.inviteTitle}>Einladen</span>
             </div>
             <button style={styles.qrClose} onClick={() => setShowInvite(false)}><X size={18} color="#94a3b8" /></button>
@@ -367,7 +384,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
                   autoFocus
                 />
                 <button style={styles.inviteAddBtn} onClick={addEmailToList} type="button">
-                  <Mail size={16} color={inviteEmail.includes("@") ? "#FF7648" : "#cbd5e1"} />
+                  <Mail size={16} color={inviteEmail.includes("@") ? "#2C2926" : "#cbd5e1"} />
                 </button>
               </div>
 
@@ -376,7 +393,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
                   {inviteList.map((email) => (
                     <div key={email} style={styles.chip}>
                       <span style={styles.chipText}>{email}</span>
-                      <button style={styles.chipRemove} onClick={() => removeEmail(email)}><X size={11} color="#FF7648" /></button>
+                      <button style={styles.chipRemove} onClick={() => removeEmail(email)}><X size={11} color="#2C2926" /></button>
                     </div>
                   ))}
                 </div>
@@ -406,7 +423,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
             <>
               <div style={styles.returnModalHeader}>
                 <div style={styles.returnModalTitleRow}>
-                  <Undo2 size={18} color="#FF7648" />
+                  <Undo2 size={18} color="#2C2926" />
                   <span style={styles.returnModalTitle}>Zurückbuchen</span>
                 </div>
                 <button style={styles.qrClose} onClick={closeReturn}><X size={18} color="#94a3b8" /></button>
@@ -449,7 +466,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
             <>
               <div style={styles.returnModalHeader}>
                 <div style={styles.returnModalTitleRow}>
-                  <Undo2 size={18} color="#FF7648" />
+                  <Undo2 size={18} color="#2C2926" />
                   <span style={styles.returnModalTitle}>Bestätigen</span>
                 </div>
                 <button style={styles.qrClose} onClick={closeReturn}><X size={18} color="#94a3b8" /></button>
@@ -461,7 +478,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
                   .map((item) => (
                     <div key={item.productId} style={{ ...styles.returnItem, justifyContent: "space-between" }}>
                       <span style={styles.returnItemName}>{item.productName}</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: "#FF7648" }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#2C2926" }}>
                         {returnQtys[item.productId] ?? item.quantity} {item.unit}
                       </span>
                     </div>
@@ -474,7 +491,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
                   style={{
                     ...styles.returnConfirmBtn,
                     opacity: returning ? 0.7 : 1,
-                    background: returnSuccess ? "linear-gradient(135deg,#16a34a,#15803d)" : "linear-gradient(135deg,#FF7648,#e5623a)",
+                    background: returnSuccess ? "linear-gradient(135deg,#16a34a,#15803d)" : "linear-gradient(135deg,#2C2926,#2C2926)",
                     transition: "background 0.4s ease",
                   }}
                   onClick={handleReturn}
@@ -510,7 +527,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
         {!isViewer && (
           <div style={styles.actions}>
             <button style={styles.actionBtn} onClick={() => { setShowInvite(true); setInviteList([]); setInviteEmail(""); setInviteError(""); }}>
-              <UserPlus size={13} /> Einladen
+              <UserPlus size={13} color="var(--c-dark-btn-text)" /> Einladen
             </button>
             <button style={styles.primaryBtn} onClick={() => { setShowCreate(true); setActiveTab("Boxen"); }}>
               <Plus size={13} /> Neue Box
@@ -526,7 +543,6 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
             position: "absolute", top: 4, left: tabIndicatorLeft,
             width: tabIndicatorWidth, height: "calc(100% - 8px)",
             borderRadius: 9, background: "var(--c-bg)",
-            boxShadow: "var(--neu-raised-sm)",
             transition: "left 0.32s cubic-bezier(0.34, 1.3, 0.64, 1), width 0.32s cubic-bezier(0.34, 1.3, 0.64, 1)",
             pointerEvents: "none", zIndex: 0,
           }} />
@@ -564,7 +580,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
                 ))}
               </div>
               <div style={styles.createActions}>
-                <button style={styles.cancelBtn} onClick={() => { setShowCreate(false); setNewName(""); setNewDesc(""); setNewColor("#FF7648"); }}>Abbrechen</button>
+                <button style={styles.cancelBtn} onClick={() => { setShowCreate(false); setNewName(""); setNewDesc(""); setNewColor("#2C2926"); }}>Abbrechen</button>
                 <button style={{ ...styles.saveBtn, opacity: creating ? 0.7 : 1 }} onClick={handleCreate} disabled={creating}>
                   {creating ? "…" : "Erstellen"}
                 </button>
@@ -573,21 +589,39 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
           )}
 
           {boxes.length === 0 && !showCreate ? (
-            <div style={styles.emptyState}>
+            <div style={styles.emptyStateBox}>
               <Package size={48} color="var(--c-border)" />
               <p style={styles.emptyText}>Noch keine Boxen an diesem Ort</p>
               {!isViewer && (
                 <button style={styles.emptyBtn} onClick={() => setShowCreate(true)}>
-                  <Plus size={14} color="#FF7648" /> Erste Box erstellen
+                  <Plus size={14} color="#2C2926" /> Erste Box erstellen
                 </button>
               )}
             </div>
           ) : (
             <div style={styles.boxGrid}>
-              {boxes.map((box) => (
+              {[...boxes]
+                .sort((a, b) => {
+                  if (a.boxNumber != null && b.boxNumber != null) return a.boxNumber - b.boxNumber;
+                  if (a.boxNumber != null) return -1;
+                  if (b.boxNumber != null) return 1;
+                  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                })
+                .map((box) => (
                 <React.Fragment key={box.id}>
                   {editingId === box.id ? (
                     <div style={styles.editCard}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                        <span style={{ fontSize: 11, color: "var(--c-text-3)", fontWeight: 700, minWidth: 54 }}>Nr.</span>
+                        <input
+                          type="number"
+                          style={{ ...styles.editInput, width: 70, textAlign: "center" as const }}
+                          value={editNumber ?? ""}
+                          onChange={(e) => setEditNumber(e.target.value ? parseInt(e.target.value) : null)}
+                          placeholder="–"
+                          min={1}
+                        />
+                      </div>
                       <input style={styles.editInput} value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") handleEdit(); if (e.key === "Escape") setEditingId(null); }} autoFocus
@@ -608,12 +642,17 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
                       </div>
                     </div>
                   ) : (
-                    <div style={{ ...styles.boxCard, boxShadow: `inset 0 0 0 1px ${box.color ?? "#FF7648"}55, var(--neu-raised-sm)` }}>
+                    <div style={{ ...styles.boxCard }}>
                       <button style={styles.boxClickable}
                         onClick={() => navigate("BoxDetail", { box, place: group })}>
                         <div style={styles.boxTop}>
-                          <Package size={22} color={box.color ?? "#FF7648"} />
-                          <ChevronRight size={14} color="var(--c-text-4)" />
+                          <Package size={22} color={box.color ?? "#2C2926"} />
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            {box.boxNumber != null && (
+                              <span style={styles.boxNumBadge}>#{box.boxNumber}</span>
+                            )}
+                            <ChevronRight size={14} color="var(--c-text-4)" />
+                          </div>
                         </div>
                         <div style={styles.boxName}>{box.name}</div>
                         <div style={styles.boxSub}>{box.description || "Box"}</div>
@@ -632,7 +671,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
             style={styles.unboxedCard}
             onClick={() => navigate("UnboxedDetail", { space: group, from: "GroupDetail", fromParam: { group } })}
           >
-            <div style={styles.unboxedIcon}><Inbox size={20} color="#FF7648" /></div>
+            <div style={styles.unboxedIcon}><Inbox size={20} color="#2C2926" /></div>
             <div style={styles.unboxedInfo}>
               <div style={styles.unboxedTitle}>Ohne Box</div>
               <div style={styles.unboxedSub}>{unboxedCount} Gegenstand{unboxedCount !== 1 ? "e" : ""}</div>
@@ -646,7 +685,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
       {activeTab === "Mitglieder" && (
         <div style={styles.memberList}>
           {members.length === 0 ? (
-            <div style={styles.emptyState}>
+            <div style={styles.emptyStateBox}>
               <p style={styles.emptyText}>Noch keine Mitglieder</p>
             </div>
           ) : (
@@ -729,7 +768,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
                 .filter((dg) => dg.persons.length > 0)
               : groupedByDate;
             return filtered.length === 0 ? (
-            <div style={styles.emptyState}>
+            <div style={styles.emptyStateBox}>
               <Clock size={40} color="var(--c-border)" />
               <p style={styles.emptyText}>Noch keine Abbuchungen</p>
             </div>
@@ -796,7 +835,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
                                         <div style={styles.bookingItemLeft}>
                                           <span style={styles.bookingItemName}>{item.productName}</span>
                                           <span style={styles.bookingItemLocation}>
-                                            <MapPin size={11} color="#FF7648" style={{ flexShrink: 0 }} />
+                                            <MapPin size={11} color="#2C2926" style={{ flexShrink: 0 }} />
                                             {formatLocation(item.parentName, item.boxName)}
                                           </span>
                                         </div>
@@ -833,6 +872,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
         </div>
       )}
 
+
       </div>{/* end tab content wrapper */}
     </div>
   );
@@ -841,63 +881,64 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
 const styles: Record<string, CSSProperties> = {
   container: { padding: "16px" },
   back: { display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginBottom: 16 },
-  backText: { color: "#FF7648", fontSize: 14, fontWeight: 600 },
+  backText: { color: "#2C2926", fontSize: 14, fontWeight: 600 },
   groupHeader: { marginBottom: 16 },
   groupTitleRow: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const, marginBottom: 16 },
   groupDot: { width: 12, height: 12, borderRadius: "50%", flexShrink: 0 },
   groupName: { fontSize: 26, fontWeight: 800, color: "var(--c-text-1)", margin: 0, marginRight: 4 },
   actions: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 4 },
-  actionBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "var(--c-surface)", border: "1.5px solid var(--c-border)", borderRadius: 10, padding: "8px 2px", fontSize: 11, fontWeight: 600, color: "var(--c-text-1)", cursor: "pointer", whiteSpace: "nowrap" as const, overflow: "hidden" as const },
-  primaryBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "#0f172a", border: "none", borderRadius: 10, padding: "8px 2px", fontSize: 11, fontWeight: 700, color: "#fff", cursor: "pointer", whiteSpace: "nowrap" as const, overflow: "hidden" as const },
+  actionBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "var(--c-dark-btn)", border: "none", borderRadius: 10, padding: "8px 2px", fontSize: 11, fontWeight: 700, color: "var(--c-dark-btn-text)", cursor: "pointer", whiteSpace: "nowrap" as const, overflow: "hidden" as const },
+  primaryBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "#534D41", border: "none", borderRadius: 10, padding: "8px 2px", fontSize: 11, fontWeight: 700, color: "#fff", cursor: "pointer", whiteSpace: "nowrap" as const, overflow: "hidden" as const },
   tabRow: { display: "flex", gap: 6, marginBottom: 16, background: "var(--c-surface-2)", borderRadius: 12, padding: 4 },
   tab: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "none", border: "none", borderRadius: 9, padding: "9px 4px", fontSize: 14, fontWeight: 600, color: "var(--c-text-3)", cursor: "pointer" },
   tabActive: {},
-  createCard: { background: "var(--c-surface)", borderRadius: 16, padding: 16, marginBottom: 12, boxShadow: "var(--neu-raised)" },
-  createInput: { width: "100%", border: "none", borderRadius: 10, padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "var(--c-bg)", color: "var(--c-text-1)", boxShadow: "var(--neu-inset-sm)" },
+  createCard: { background: "var(--c-surface)", borderRadius: 16, padding: 16, marginBottom: 12 },
+  createInput: { width: "100%", border: "none", borderRadius: 10, padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "var(--c-bg)", color: "var(--c-text-1)" },
   createActions: { display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" },
-  cancelBtn: { background: "var(--c-bg)", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--c-text-2)", boxShadow: "var(--neu-raised-sm)" },
-  saveBtn: { background: "#FF7648", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff" },
-  emptyState: { textAlign: "center", padding: "48px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
+  cancelBtn: { background: "var(--c-bg)", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--c-text-2)" },
+  saveBtn: { background: "#2C2926", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff" },
+  emptyStateBox: { textAlign: "center", padding: "48px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
   emptyText: { fontSize: 14, color: "var(--c-text-3)" },
-  emptyBtn: { display: "flex", alignItems: "center", gap: 6, background: "var(--c-accent-bg)", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#FF7648", cursor: "pointer" },
+  emptyBtn: { display: "flex", alignItems: "center", gap: 6, background: "var(--c-accent-bg)", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2C2926", cursor: "pointer" },
   boxGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
   boxCard: { background: "var(--c-surface)", borderRadius: 14, overflow: "hidden" },
   boxClickable: { display: "block", width: "100%", padding: "12px 10px", background: "none", border: "none", cursor: "pointer", textAlign: "left" },
   boxTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 },
   boxName: { fontSize: 13, fontWeight: 700, color: "var(--c-text-1)", marginBottom: 2 },
   boxSub: { fontSize: 11, color: "var(--c-text-3)" },
+  boxNumBadge: { fontSize: 10, fontWeight: 700, color: "#2C2926", background: "var(--c-accent-bg)", borderRadius: 6, padding: "2px 6px" },
   boxActions: { display: "flex", justifyContent: "flex-end", gap: 2, padding: "0 4px 6px" },
   iconBtn: { background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", alignItems: "center", minWidth: 36, minHeight: 36, justifyContent: "center" },
-  editCard: { background: "var(--c-surface)", borderRadius: 14, padding: 12, boxShadow: "var(--neu-raised-sm)" },
-  editInput: { width: "100%", border: "1px solid #FF7648", borderRadius: 8, padding: "7px 10px", fontSize: 13, outline: "none", background: "var(--c-bg)", color: "var(--c-text-1)", boxSizing: "border-box" },
+  editCard: { background: "var(--c-surface)", borderRadius: 14, padding: 12 },
+  editInput: { width: "100%", border: "1px solid #2C2926", borderRadius: 8, padding: "7px 10px", fontSize: 13, outline: "none", background: "var(--c-bg)", color: "var(--c-text-1)", boxSizing: "border-box" },
   editActions: { display: "flex", gap: 4, marginTop: 8, justifyContent: "flex-end" },
   colorLabel: { fontSize: 10, fontWeight: 700, color: "var(--c-text-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 10, marginBottom: 6 },
   colorRow: { display: "flex", gap: 7, flexWrap: "wrap" },
   colorSwatch: { width: 30, height: 30, borderRadius: "50%", border: "none", cursor: "pointer", padding: 0, flexShrink: 0, transition: "box-shadow 0.15s" },
-  deleteCard: { background: "var(--c-surface)", borderRadius: 14, padding: 12, boxShadow: "var(--neu-raised-sm)", display: "flex", flexDirection: "column", gap: 8 },
+  deleteCard: { background: "var(--c-surface)", borderRadius: 14, padding: 12, display: "flex", flexDirection: "column", gap: 8 },
   deleteText: { fontSize: 12, color: "var(--c-text-1)", fontWeight: 500 },
   confirmDeleteBtn: { background: "#ef4444", border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#fff" },
   memberList: { display: "flex", flexDirection: "column", gap: 10 },
   historyList: { display: "flex", flexDirection: "column", gap: 10 },
   historySearch: { border: "1.5px solid var(--c-border)", borderRadius: 12, padding: "10px 14px", fontSize: 14, outline: "none", background: "var(--c-surface)", color: "var(--c-text-1)", width: "100%", boxSizing: "border-box" as const },
-  unboxedCard: { width: "100%", display: "flex", alignItems: "center", gap: 14, background: "var(--c-surface)", borderRadius: 16, padding: "16px", border: "none", cursor: "pointer", textAlign: "left", boxShadow: "var(--neu-raised-sm)", marginTop: 10 },
+  unboxedCard: { width: "100%", display: "flex", alignItems: "center", gap: 14, background: "var(--c-surface)", borderRadius: 16, padding: "16px", border: "none", cursor: "pointer", textAlign: "left", marginTop: 10 },
   unboxedIcon: { width: 44, height: 44, borderRadius: 12, background: "var(--c-accent-bg)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   unboxedInfo: { flex: 1 },
   unboxedTitle: { fontSize: 15, fontWeight: 700, color: "var(--c-text-1)" },
   unboxedSub: { fontSize: 12, color: "var(--c-text-3)", marginTop: 2 },
-  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
-  qrModal: { background: "var(--c-surface)", borderRadius: 20, padding: "16px", width: "100%", maxWidth: 300, display: "flex", flexDirection: "column", gap: 10, boxShadow: "0 4px 24px rgba(163,177,198,0.5)" },
+  qrModalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
+  qrModal: { background: "var(--c-surface)", borderRadius: 20, padding: "16px", width: "100%", maxWidth: 300, display: "flex", flexDirection: "column", gap: 10 },
   qrModalHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   qrModalTitle: { fontSize: 15, fontWeight: 800, color: "var(--c-text-1)" },
   qrClose: { background: "none", border: "none", cursor: "pointer", display: "flex", padding: 2 },
   qrModalSub: { fontSize: 12, color: "var(--c-text-3)", lineHeight: 1.4, margin: 0 },
-  qrBox: { display: "flex", justifyContent: "center", background: "var(--c-bg)", borderRadius: 14, padding: 10, boxShadow: "var(--neu-inset-sm)" },
-  qrLinkRow: { background: "var(--c-bg)", borderRadius: 10, padding: "6px 10px", boxShadow: "var(--neu-inset-sm)" },
+  qrBox: { display: "flex", justifyContent: "center", background: "var(--c-bg)", borderRadius: 14, padding: 10 },
+  qrLinkRow: { background: "var(--c-bg)", borderRadius: 10, padding: "6px 10px" },
   qrLinkText: { fontSize: 10, color: "var(--c-text-3)", wordBreak: "break-all" as const, display: "block" },
   qrActions: { display: "flex", gap: 8 },
-  qrCopyBtn: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "linear-gradient(135deg, #FF7648, #e5623a)", color: "#fff", border: "none", borderRadius: 10, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" },
-  qrOpenBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--c-bg)", color: "var(--c-text-1)", border: "none", borderRadius: 10, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", boxShadow: "var(--neu-raised-sm)" },
-  dateGroup:         { background: "var(--c-surface)", borderRadius: 14, overflow: "hidden", boxShadow: "var(--neu-raised-sm)", marginBottom: 8 },
+  qrCopyBtn: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "linear-gradient(135deg, #2C2926, #2C2926)", color: "#fff", border: "none", borderRadius: 10, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" },
+  qrOpenBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--c-bg)", color: "var(--c-text-1)", border: "none", borderRadius: 10, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" },
+  dateGroup:         { background: "var(--c-surface)", borderRadius: 14, overflow: "hidden", marginBottom: 8 },
   dateHeader:        { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px", background: "none", border: "none", cursor: "pointer", textAlign: "left" },
   dateLabelText:     { fontSize: 14, fontWeight: 700, color: "var(--c-text-1)" },
   dateRight:         { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 },
@@ -905,7 +946,7 @@ const styles: Record<string, CSSProperties> = {
   dateEntries:       { borderTop: "1px solid var(--c-border-2)", padding: "8px 10px 10px", display: "flex", flexDirection: "column", gap: 10 },
   personGroup:       { display: "flex", flexDirection: "column", gap: 4 },
   personLabel:       { display: "flex", alignItems: "center", gap: 8, padding: "4px 2px" },
-  personLabelAvatar: { width: 24, height: 24, borderRadius: "50%", background: "linear-gradient(135deg, #FF7648, #e5623a)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 },
+  personLabelAvatar: { width: 24, height: 24, borderRadius: "50%", background: "linear-gradient(135deg, #2C2926, #2C2926)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 },
   personLabelName:   { fontSize: 12, fontWeight: 700, color: "var(--c-text-2)" },
   bookingCard:       { background: "var(--c-surface-2)", borderRadius: 10 },
   returnedBadge:      { fontSize: 13, fontWeight: 600, color: "#16a34a", background: "#dcfce7", borderRadius: 11, padding: "0 10px", height: 44, flexShrink: 0, margin: "0 8px", whiteSpace: "nowrap" as const, display: "flex", alignItems: "center", gap: 6 },
@@ -920,18 +961,18 @@ const styles: Record<string, CSSProperties> = {
   bookingTime:       { fontSize: 14, fontWeight: 700, color: "var(--c-text-1)" },
   bookingNumber:     { fontSize: 11, color: "var(--c-text-3)", fontWeight: 500 },
   bookingRight:      { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 },
-  bookingCount:      { fontSize: 11, fontWeight: 600, color: "#FF7648", background: "var(--c-accent-bg)", borderRadius: 6, padding: "2px 7px" },
+  bookingCount:      { fontSize: 11, fontWeight: 600, color: "#2C2926", background: "var(--c-accent-bg)", borderRadius: 6, padding: "2px 7px" },
   bookingItems:      { borderTop: "1px solid var(--c-border-2)", padding: "8px 12px 10px", display: "flex", flexDirection: "column", gap: 0 },
   bookingItemRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 0" },
   bookingItemLeft: { display: "flex", flexDirection: "column", gap: 2, minWidth: 0 },
   bookingItemName: { fontSize: 13, color: "var(--c-text-1)", fontWeight: 500 },
-  bookingItemLocation: { display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "#FF7648", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
-  bookingItemQty: { fontSize: 13, fontWeight: 700, color: "#FF7648", flexShrink: 0 },
+  bookingItemLocation: { display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "#2C2926", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
+  bookingItemQty: { fontSize: 13, fontWeight: 700, color: "#2C2926", flexShrink: 0 },
   memberItem: { display: "flex", alignItems: "center", gap: 12, background: "var(--c-surface)", borderRadius: 14, padding: 14 },
-  memberAvatar: { width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg, #FF7648, #e5623a)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13, flexShrink: 0 },
+  memberAvatar: { width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg, #2C2926, #2C2926)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13, flexShrink: 0 },
   memberName: { fontSize: 14, fontWeight: 600, color: "var(--c-text-1)", display: "flex", alignItems: "center", gap: 6 },
   memberEmail: { fontSize: 12, color: "var(--c-text-3)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
-  youBadge: { fontSize: 10, fontWeight: 700, color: "#FF7648", background: "var(--c-accent-bg)", borderRadius: 6, padding: "1px 6px" },
+  youBadge: { fontSize: 10, fontWeight: 700, color: "#2C2926", background: "var(--c-accent-bg)", borderRadius: 6, padding: "1px 6px" },
   roleBadge: { flexShrink: 0, background: "var(--c-surface-2)", borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "var(--c-text-2)" },
   memberActions: { display: "flex", alignItems: "center", gap: 6, flexShrink: 0 },
   roleSelect: { border: "1px solid var(--c-border)", borderRadius: 8, padding: "8px 10px", fontSize: 14, fontWeight: 600, color: "var(--c-text-1)", background: "var(--c-surface-2)", cursor: "pointer", outline: "none", minHeight: 40 },
@@ -940,16 +981,16 @@ const styles: Record<string, CSSProperties> = {
   removeQuestion: { fontSize: 12, fontWeight: 600, color: "#ef4444" },
   confirmRemoveBtn: { background: "#ef4444", border: "none", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 700, color: "#fff", cursor: "pointer" },
   cancelSmallBtn: { background: "var(--c-surface-2)", border: "none", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, color: "var(--c-text-2)", cursor: "pointer" },
-  inviteModal: { background: "var(--c-surface)", borderRadius: 20, padding: "16px", width: "100%", maxWidth: 360, display: "flex", flexDirection: "column", gap: 10, boxShadow: "0 4px 24px rgba(163,177,198,0.5)" },
+  inviteModal: { background: "var(--c-surface)", borderRadius: 20, padding: "16px", width: "100%", maxWidth: 360, display: "flex", flexDirection: "column", gap: 10 },
   inviteTabRow: { display: "flex", gap: 8, background: "var(--c-bg)", borderRadius: 12, padding: 4 },
   inviteTabBtn: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "none", border: "none", borderRadius: 9, padding: "8px 12px", fontSize: 13, fontWeight: 600, color: "var(--c-text-3)", cursor: "pointer", transition: "all 0.18s" },
-  inviteTabActive: { background: "var(--c-surface)", color: "#FF7648", boxShadow: "var(--neu-raised-sm)" },
+  inviteTabActive: { background: "var(--c-surface)", color: "#2C2926" },
   inviteHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   inviteHeaderLeft: { display: "flex", alignItems: "center", gap: 8 },
-  inviteHeaderIcon: { width: 28, height: 28, background: "var(--c-accent-bg)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--neu-raised-sm)" },
+  inviteHeaderIcon: { width: 28, height: 28, background: "var(--c-accent-bg)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" },
   inviteTitle: { fontSize: 15, fontWeight: 800, color: "var(--c-text-1)" },
   inviteLabel: { fontSize: 12, fontWeight: 600, color: "var(--c-text-2)" },
-  inviteInputRow: { display: "flex", alignItems: "center", borderRadius: 12, overflow: "hidden", background: "var(--c-bg)", boxShadow: "var(--neu-inset-sm)" },
+  inviteInputRow: { display: "flex", alignItems: "center", borderRadius: 12, overflow: "hidden", background: "var(--c-bg)" },
   inviteInput: { flex: 1, border: "none", outline: "none", padding: "10px 12px", fontSize: 14, color: "var(--c-text-1)", background: "transparent" },
   inviteAddBtn: { padding: "0 12px", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", height: "100%" },
   chipRow: { display: "flex", flexWrap: "wrap" as const, gap: 6 },
@@ -958,10 +999,10 @@ const styles: Record<string, CSSProperties> = {
   chipRemove: { background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", padding: 1 },
   inviteError: { background: "#fef2f2", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: "#dc2626" },
   inviteActions: { display: "flex", gap: 8, marginTop: 2 },
-  inviteCancelBtn: { flex: 1, background: "var(--c-bg)", border: "none", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, color: "var(--c-text-1)", cursor: "pointer", boxShadow: "var(--neu-raised-sm)" },
-  inviteConfirmBtn: { flex: 1, background: "linear-gradient(135deg, #FF7648, #e5623a)", border: "none", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer" },
-  returnBtnInline: { background: "#FF7648", border: "none", borderRadius: 11, cursor: "pointer", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, margin: "0 8px" },
-  returnModal: { background: "var(--c-surface)", borderRadius: 20, padding: "16px", width: "100%", maxWidth: 430, maxHeight: "calc(100dvh - 120px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 -4px 24px rgba(163,177,198,0.45)" },
+  inviteCancelBtn: { flex: 1, background: "var(--c-bg)", border: "none", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, color: "var(--c-text-1)", cursor: "pointer" },
+  inviteConfirmBtn: { flex: 1, background: "linear-gradient(135deg, #2C2926, #2C2926)", border: "none", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer" },
+  returnBtnInline: { background: "#2C2926", border: "none", borderRadius: 11, cursor: "pointer", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, margin: "0 8px" },
+  returnModal: { background: "var(--c-surface)", borderRadius: 20, padding: "16px", width: "100%", maxWidth: 430, maxHeight: "calc(100dvh - 120px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 },
   returnModalHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   returnModalTitleRow: { display: "flex", alignItems: "center", gap: 8 },
   returnModalTitle: { fontSize: 17, fontWeight: 800, color: "#0f172a" },
@@ -978,5 +1019,14 @@ const styles: Record<string, CSSProperties> = {
   returnError: { background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "8px 12px", fontSize: 13, color: "#dc2626" },
   returnActions: { display: "flex", gap: 10 },
   returnCancelBtn: { flex: 1, background: "#f1f5f9", border: "none", borderRadius: 12, padding: "13px 0", fontSize: 14, fontWeight: 600, color: "#0f172a", cursor: "pointer" },
-  returnConfirmBtn: { flex: 1, background: "linear-gradient(135deg, #FF7648, #e5623a)", border: "none", borderRadius: 12, padding: "13px 0", fontSize: 14, fontWeight: 700, color: "#fff", cursor: "pointer" },
+  returnConfirmBtn: { flex: 1, background: "linear-gradient(135deg, #2C2926, #2C2926)", border: "none", borderRadius: 12, padding: "13px 0", fontSize: 14, fontWeight: 700, color: "#fff", cursor: "pointer" },
+  emptyState: { display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", padding: "40px 0" },
+  docList: { display: "flex", flexDirection: "column" as const, gap: 2 },
+  docItem: { display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--c-surface)", borderRadius: 12 },
+  docName: { fontSize: 14, color: "var(--c-text-1)", flex: 1 },
+  docLink: { fontSize: 14, color: "#2C2926", flex: 1, textDecoration: "none", fontWeight: 500 },
+  unlinkBtn: { background: "none", border: "1px solid var(--c-border)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: "var(--c-text-2)", cursor: "pointer" },
+  modalOverlay: { position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" },
+  folderPickerModal: { background: "var(--c-surface)", borderRadius: "20px 20px 0 0", padding: "20px 16px calc(env(safe-area-inset-bottom) + 20px)", width: "100%", maxWidth: 500, display: "flex", flexDirection: "column" as const, gap: 4 },
+  folderPickerItem: { display: "flex", alignItems: "center", gap: 10, padding: "12px 10px", borderRadius: 10, border: "none", cursor: "pointer", width: "100%", textAlign: "left" as const },
 };

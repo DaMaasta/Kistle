@@ -1,10 +1,11 @@
 declare const __APP_VERSION__: string;
 import React from "react";
 import type { CSSProperties } from "react";
-import { User, ChevronRight, LogOut, Puzzle } from "lucide-react";
+import { User, ChevronRight, LogOut, Bell } from "lucide-react";
 import type { NavigateFn } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import { logoutUser } from "../services/auth.service";
+import { isNotificationSupported, requestNotificationPermission, getNotificationsEnabled, setNotificationsEnabled } from "../services/notifications.service";
 
 interface RowProps {
   icon: React.ElementType;
@@ -23,14 +24,14 @@ function Row({ icon: Icon, label, value, toggle, onToggle, onClick, last }: RowP
       onClick={onClick ?? onToggle}
     >
       <div style={styles.rowIcon}>
-        <Icon size={17} color="#FF7648" />
+        <Icon size={17} color="#2C2926" />
       </div>
       <div style={styles.rowContent}>
         <span style={styles.rowLabel}>{label}</span>
         {value !== undefined && <span style={styles.rowValue}>{value}</span>}
       </div>
       {toggle !== undefined ? (
-        <div style={{ ...styles.toggle, background: toggle ? "#FF7648" : "var(--c-surface-2)" }}>
+        <div style={{ ...styles.toggle, background: toggle ? "#2C2926" : "var(--c-surface-2)" }}>
           <div style={{ ...styles.toggleThumb, transform: toggle ? "translateX(18px)" : "translateX(0)" }} />
         </div>
       ) : (
@@ -45,6 +46,25 @@ export default function Settings({ navigate }: { navigate: NavigateFn }): React.
   const displayName = user?.displayName ?? user?.email ?? "";
   const email = user?.email ?? "";
   const [logoutConfirm, setLogoutConfirm] = React.useState(false);
+  const [notifEnabled, setNotifEnabled] = React.useState(() =>
+    isNotificationSupported() && Notification.permission === "granted" && getNotificationsEnabled()
+  );
+  const notifDenied = isNotificationSupported() && Notification.permission === "denied";
+
+  const handleNotifToggle = async () => {
+    if (!isNotificationSupported() || notifDenied) return;
+    if (!notifEnabled) {
+      if (Notification.permission !== "granted") {
+        const result = await requestNotificationPermission();
+        if (!result) return;
+      }
+      setNotificationsEnabled(true);
+      setNotifEnabled(true);
+    } else {
+      setNotificationsEnabled(false);
+      setNotifEnabled(false);
+    }
+  };
 
   return (
     <div style={styles.container}>
@@ -58,10 +78,17 @@ export default function Settings({ navigate }: { navigate: NavigateFn }): React.
         <Row icon={User} label="E-Mail" value={email} onClick={() => navigate("AccountSettings")} last />
       </div>
 
-      {/* Erweiterungen */}
-      <div style={styles.sectionLabel}>ERWEITERUNGEN</div>
+      {/* App */}
+      <div style={styles.sectionLabel}>APP</div>
       <div style={styles.section}>
-        <Row icon={Puzzle} label="Erweiterungen" onClick={() => navigate("Erweiterungen")} last />
+        <Row
+          icon={Bell}
+          label="Benachrichtigungen"
+          value={notifDenied ? "Im Browser blockiert" : undefined}
+          toggle={notifDenied ? undefined : notifEnabled}
+          onToggle={handleNotifToggle}
+          last
+        />
       </div>
 
       {/* Abmelden */}
@@ -90,7 +117,7 @@ const styles: Record<string, CSSProperties> = {
   title:    { fontSize: 28, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
   subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4, marginBottom: 20 },
   profileCard: {
-    background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
+    background: "#2C2926",
     borderRadius: 18, padding: "20px",
     display: "flex", alignItems: "center", gap: 16, marginBottom: 24,
   },
@@ -107,7 +134,7 @@ const styles: Record<string, CSSProperties> = {
   },
   profileEmail: { fontSize: 13, color: "rgba(255,255,255,0.75)" },
   sectionLabel: { fontSize: 11, fontWeight: 700, color: "var(--c-text-3)", letterSpacing: "0.08em", marginBottom: 8, marginTop: 4 },
-  section: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--neu-raised-sm)", marginBottom: 20 },
+  section: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden", marginBottom: 20 },
   row: {
     display: "flex", alignItems: "center", gap: 14,
     padding: "14px 16px", background: "none",
@@ -121,7 +148,7 @@ const styles: Record<string, CSSProperties> = {
   toggleThumb: {
     position: "absolute", top: 3, left: 3,
     width: 18, height: 18, borderRadius: "50%",
-    background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+    background: "#fff",
     transition: "transform 0.2s",
   },
   version: { fontSize: 11, color: "var(--c-text-4)", textAlign: "center", marginTop: 16, marginBottom: 4 },

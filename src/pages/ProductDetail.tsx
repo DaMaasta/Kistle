@@ -16,7 +16,7 @@ interface ProductDetailProps {
 }
 
 const UNITS: ProductUnit[] = ["Stück", "kg", "g", "L", "ml", "Packung", "Flasche", "Dose", "Paar", "Box"];
-const PRODUCT_COLORS = ["#FF7648","#ef4444","#eab308","#22c55e","#14b8a6","#3b82f6","#8b5cf6","#ec4899"];
+const PRODUCT_COLORS = ["#2C2926","#ef4444","#eab308","#22c55e","#14b8a6","#3b82f6","#8b5cf6","#ec4899"];
 
 export default function ProductDetail({ navigate, params }: ProductDetailProps): React.ReactElement {
   const product = params.product as Product;
@@ -210,7 +210,7 @@ export default function ProductDetail({ navigate, params }: ProductDetailProps):
                 <Trash2 size={16} color="#ef4444" />
               </button>
               <button
-                style={{ ...styles.cartBtn, background: inCart ? "#c2410c" : "#FF7648", opacity: quantity === 0 ? 0.4 : 1 }}
+                style={{ ...styles.cartBtn, background: inCart ? "#c2410c" : "#2C2926", opacity: quantity === 0 ? 0.4 : 1 }}
                 onClick={() => setModalOpen(true)} disabled={quantity === 0}
               >
                 <ShoppingCart size={16} color="#fff" />
@@ -218,7 +218,7 @@ export default function ProductDetail({ navigate, params }: ProductDetailProps):
               </button>
               {isDirty && (
                 <button
-                  style={{ ...styles.saveBtn, opacity: saving ? 0.7 : 1, background: saveSuccess ? "linear-gradient(135deg,#22c55e,#16a34a)" : "linear-gradient(135deg,#FF7648,#e5623a)" }}
+                  style={{ ...styles.saveBtn, opacity: saving ? 0.7 : 1, background: saveSuccess ? "linear-gradient(135deg,#22c55e,#16a34a)" : "linear-gradient(135deg,#2C2926,#2C2926)" }}
                   onClick={handleSave} disabled={saving}
                 >
                   {saving ? "…" : saveSuccess ? "✓" : "Speichern"}
@@ -263,7 +263,7 @@ export default function ProductDetail({ navigate, params }: ProductDetailProps):
 }
 
 const styles: Record<string, CSSProperties> = {
-  container: { padding: "0 16px 32px", display: "flex", flexDirection: "column", gap: 12, boxSizing: "border-box" },
+  container: { padding: "12px 16px 32px", display: "flex", flexDirection: "column", gap: 12, boxSizing: "border-box" },
 
   imagePicker: {
     position: "relative", width: "100%", aspectRatio: "1 / 1", maxHeight: 280,
@@ -286,7 +286,7 @@ const styles: Record<string, CSSProperties> = {
     padding: 0, boxSizing: "border-box", flexShrink: 0,
   },
 
-  card: { background: "var(--c-surface)", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", flexShrink: 0 },
+  card: { background: "var(--c-surface)", borderRadius: 12, overflow: "hidden", flexShrink: 0 },
 
   textarea: {
     width: "100%", border: "none", outline: "none", resize: "none",
@@ -311,7 +311,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer",
   },
   saveBtn: {
-    flex: 1, background: "linear-gradient(135deg, #FF7648 0%, #e5623a 100%)",
+    flex: 1, background: "#2C2926",
     color: "#fff", border: "none", borderRadius: 12,
     padding: "12px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer",
   },

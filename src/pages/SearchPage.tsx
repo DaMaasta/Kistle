@@ -14,7 +14,7 @@ interface SearchPageProps {
 }
 
 const COLOR_NAMES: Record<string, string> = {
-  "#FF7648": "orange",
+  "#2C2926": "orange",
   "#ef4444": "rot",
   "#eab308": "gelb",
   "#22c55e": "grün",
@@ -134,7 +134,7 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
                     )}
                   </div>
                   <button
-                    style={{ ...styles.cartBtn, background: inCart ? "#c2410c" : "#FF7648" }}
+                    style={{ ...styles.cartBtn, background: inCart ? "#c2410c" : "#2C2926" }}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!box) return;
@@ -192,8 +192,8 @@ const styles: Record<string, CSSProperties> = {
   input: { flex: 1, border: "none", outline: "none", fontSize: 16, color: "var(--c-text-1)", background: "transparent", padding: "13px 0" },
   hint: { textAlign: "center", padding: "60px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
   hintText: { fontSize: 14, color: "var(--c-text-3)" },
-  list: { display: "flex", flexDirection: "column", gap: 8, padding: "0 16px calc(env(safe-area-inset-bottom) + 90px)" },
-  card: { background: "var(--c-surface)", borderRadius: 16, boxShadow: "var(--neu-raised-sm)", overflow: "hidden" },
+  list: { display: "flex", flexDirection: "column", gap: 8, padding: "0 16px 8px" },
+  card: { background: "var(--c-surface)", borderRadius: 16, overflow: "hidden" },
   item: { display: "flex", alignItems: "center", gap: 12, padding: "10px 14px" },
   itemImg: { width: 64, height: 64, borderRadius: 12, background: "var(--c-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" },
   itemImgEl: { width: "100%", height: "100%", objectFit: "cover" },
@@ -204,6 +204,6 @@ const styles: Record<string, CSSProperties> = {
   itemAvail: { display: "flex", alignItems: "baseline", marginTop: 3 },
   itemQtyNum: { fontSize: 15, fontWeight: 800, color: "var(--c-text-1)" },
   itemUnit: { fontSize: 12, color: "var(--c-text-3)", marginLeft: 3 },
-  itemLocation: { fontSize: 11, color: "#FF7648", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" },
+  itemLocation: { fontSize: 11, color: "#2C2926", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" },
   cartBtn: { border: "none", borderRadius: 11, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
 };
