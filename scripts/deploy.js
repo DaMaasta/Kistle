@@ -24,10 +24,20 @@ const PATH = process.env.DEPLOY_PATH ?? env['DEPLOY_PATH'] ?? '/var/www/kistle';
 
 console.log(`Deploye nach ${USER}@${HOST}:${PATH} …`);
 
+// Erst vollständig in ein Staging-Verzeichnis hochladen, dann auf dem Server lokal
+// abgleichen. Bricht der Upload ab (z.B. Tunnel-Aussetzer), bleibt die Live-Seite
+// unverändert – vorher wurde sie zuerst geleert und blieb bei einem Abbruch leer.
+// PATH selbst wird nicht ausgetauscht, weil nginx das Verzeichnis per Bind-Mount einbindet.
+const STAGING = `${PATH}-staging`;
+
 try {
-  // Zielverzeichnis leeren und Build hochladen
-  execSync(`ssh ${USER}@${HOST} "mkdir -p ${PATH} && rm -rf ${PATH}/*"`, { stdio: 'inherit' });
-  execSync(`scp -r dist/* ${USER}@${HOST}:${PATH}/`, { stdio: 'inherit' });
+  execSync(`ssh ${USER}@${HOST} "rm -rf ${STAGING} && mkdir -p ${STAGING} ${PATH}"`, { stdio: 'inherit' });
+  execSync(`scp -r dist/* ${USER}@${HOST}:${STAGING}/`, { stdio: 'inherit' });
+  // --delay-updates: alle neuen Dateien erst am Ende an ihren Platz; --delete-after: alte erst danach entfernen
+  execSync(
+    `ssh ${USER}@${HOST} "rsync -a --delay-updates --delete-after ${STAGING}/ ${PATH}/ && rm -rf ${STAGING}"`,
+    { stdio: 'inherit' }
+  );
   console.log('✓ Deploy erfolgreich');
 } catch (err) {
   console.error('Deploy fehlgeschlagen:', err.message);
