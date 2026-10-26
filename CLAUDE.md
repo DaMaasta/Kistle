@@ -57,7 +57,7 @@ sudo docker logs nginx --tail 20
 SSH-Key muss eingerichtet sein: `ssh-copy-id damaasta@ssh.kistle.uk` (Key: `~/.ssh/kistle_deploy`, läuft über Cloudflare Tunnel)
 
 ### Version-Schema
-`4.XX` — bump-version.js erhöht Minor automatisch um 1 bei jedem Deploy.
+`MAJOR.MM` (z.B. `8.00`) — bump-version.js erhöht bei jedem Deploy die zweistellige Minor-Version um 1; nach `.99` steigt die Hauptversion (`8.99` → `9.00`).
 
 ### Umgebungsvariablen (.env.local)
 ```
