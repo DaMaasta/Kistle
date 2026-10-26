@@ -9,7 +9,7 @@ Inventar- und Lagerverwaltungs-PWA (React/TypeScript). Nutzer verwalten hierarch
 
 | | |
 |---|---|
-| **IP** | `10.10.30.167` (WLAN, neuer Standort) |
+| **IP** | `10.10.60.189` (WLAN, neuer Standort; lokal per SSH-Key `~/.ssh/kistle_deploy`) |
 | **SSH** | `ssh damaasta@ssh.kistle.uk` (via Cloudflare Tunnel) |
 | **OS** | Ubuntu Server + Docker |
 | **Domain** | `https://kistle.uk` via Cloudflare Tunnel |
@@ -20,7 +20,7 @@ Inventar- und Lagerverwaltungs-PWA (React/TypeScript). Nutzer verwalten hierarch
 | `nginx` | 80/443 | `/opt/docker/nginx/conf.d/kistle.conf` |
 | `postgres:16` | 5432 | DB: `webapp`, Zugangsdaten ausschließlich aus der Server-`.env` |
 | `webapp` (Node.js/Express) | 3000 | `/opt/docker/webapp/.env` |
-| `cloudflared` | — | Tunnel: `heaven-tunnel` |
+| `cloudflared` | — | Tunnel: `kistle` (ID `9fae6a5b-e0fd-45c4-a3dc-1925fa699cbd`) |
 | `homeassistant` | 8123 | — |
 | `mosquitto` | 1883 | — |
 
@@ -54,7 +54,7 @@ sudo docker logs nginx --tail 20
 | **API URL** | `https://kistle.uk/api` (in `.env.local`) |
 
 ### Deploy-Voraussetzung
-SSH-Key muss eingerichtet sein: `ssh-copy-id damaasta@192.168.0.71`
+SSH-Key muss eingerichtet sein: `ssh-copy-id damaasta@ssh.kistle.uk` (Key: `~/.ssh/kistle_deploy`, läuft über Cloudflare Tunnel)
 
 ### Version-Schema
 `4.XX` — bump-version.js erhöht Minor automatisch um 1 bei jedem Deploy.
@@ -64,7 +64,7 @@ SSH-Key muss eingerichtet sein: `ssh-copy-id damaasta@192.168.0.71`
 VITE_API_URL=https://kistle.uk/api
 VITE_GOOGLE_CLIENT_ID=741879030804-ceq6tg0fjqicjg5k15q0o2b0gaaimlgs.apps.googleusercontent.com
 VITE_MQTT_URL=wss://5ea10b68b9354c649b6fde9702eaa968.s1.eu.hivemq.cloud:8884/mqtt
-DEPLOY_HOST=192.168.0.71
+DEPLOY_HOST=ssh.kistle.uk
 DEPLOY_USER=damaasta
 DEPLOY_PATH=/mnt/data/www
 ```

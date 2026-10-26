@@ -124,29 +124,75 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+// Felder, die per PUT geändert werden dürfen. Nicht mitgeschickte Felder bleiben unverändert.
+const UPDATABLE_FIELDS = {
+  name:        { column: 'name',         normalize: v => v },
+  description: { column: 'description',  normalize: v => v ?? '' },
+  category:    { column: 'category',     normalize: v => v ?? '' },
+  barcode:     { column: 'barcode',      normalize: v => v || null },
+  minQuantity: { column: 'min_quantity', normalize: v => v ?? null },
+  unit:        { column: 'unit',         normalize: v => v },
+  imageUrl:    { column: 'image_url',    normalize: v => v || null },
+  color:       { column: 'color',        normalize: v => v || null },
+};
+
 // PUT /products/:id
+// quantity setzt den Bestand absolut. Mit expectedQuantity (dem Bestand, den der Client
+// beim Bearbeiten gesehen hat) wird nur gespeichert, wenn sich der Bestand inzwischen
+// nicht durch eine Buchung geändert hat – sonst 409 statt stiller Überschreibung.
 router.put('/:id', auth, async (req, res) => {
-  const { name, description, category, barcode, quantity, minQuantity, unit, imageUrl, color } = req.body;
+  const body = req.body || {};
   try {
     const productAccess = await getProductAccess(req.user.uid, req.params.id);
     if (!productAccess) return res.status(404).json({ error: 'Nicht gefunden' });
     if (!hasRole(productAccess.access, WRITE_ROLES)) return forbidden(res);
-    if (quantity !== undefined && (!Number.isFinite(Number(quantity)) || Number(quantity) < 0)) {
-      return res.status(400).json({ error: 'Ungültige Menge' });
+
+    if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim())) {
+      return res.status(400).json({ error: 'Name darf nicht leer sein' });
     }
-    await pool.query(
-      `UPDATE products SET name=$1, description=$2, category=$3, barcode=$4,
-       quantity=$5, min_quantity=$6, unit=$7, image_url=$8, color=$9,
-       last_modified_by=$10, last_modified_at=NOW()
-       WHERE id=$11`,
-      [name, description ?? '', category ?? '', barcode ?? null,
-       quantity ?? 0, minQuantity ?? null, unit,
-       imageUrl !== undefined ? imageUrl : null,
-       color ?? null, req.user.uid, req.params.id]
+    if (body.unit !== undefined && !body.unit) return res.status(400).json({ error: 'Ungültige Einheit' });
+
+    const sets = [];
+    const params = [];
+    for (const [key, { column, normalize }] of Object.entries(UPDATABLE_FIELDS)) {
+      if (body[key] === undefined) continue;
+      params.push(normalize(body[key]));
+      sets.push(`${column}=$${params.length}`);
+    }
+
+    let expectedCondition = '';
+    if (body.quantity !== undefined) {
+      const quantity = Number(body.quantity);
+      if (!Number.isFinite(quantity) || quantity < 0) return res.status(400).json({ error: 'Ungültige Menge' });
+      params.push(quantity);
+      sets.push(`quantity=$${params.length}`);
+      if (body.expectedQuantity !== undefined) {
+        const expected = Number(body.expectedQuantity);
+        if (!Number.isFinite(expected)) return res.status(400).json({ error: 'Ungültige Menge' });
+        params.push(expected);
+        expectedCondition = ` AND quantity=$${params.length}`;
+      }
+    }
+
+    params.push(req.user.uid);
+    sets.push(`last_modified_by=$${params.length}`, 'last_modified_at=NOW()');
+    params.push(req.params.id);
+
+    const { rows, rowCount } = await pool.query(
+      `UPDATE products SET ${sets.join(', ')}
+       WHERE id=$${params.length}${expectedCondition}
+       RETURNING *`,
+      params
     );
-    res.json({ success: true });
+    if (rowCount === 0) {
+      return res.status(409).json({ error: 'Der Bestand wurde inzwischen geändert. Bitte neu laden und erneut speichern.' });
+    }
+    res.json({ success: true, product: mapProduct(rows[0]) });
     broadcast('products', { productId: req.params.id });
   } catch (err) {
+    if (err.code === '23514' || err.code === '23502') {
+      return res.status(400).json({ error: 'Ungültige Werte' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Fehler beim Updaten' });
   }

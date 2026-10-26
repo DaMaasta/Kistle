@@ -7,6 +7,15 @@ import { useAuth } from "../../contexts/AuthContext";
 import { subscribeToGroupBookings, createReturnBooking } from "../../services/bookings.service";
 import { getInitials, formatLocation } from "../../utils/stringUtils";
 
+// Noch offene (nicht zurückgebuchte) Menge einer Position
+function remainingQty(item: BookingItem): number {
+  return Math.max(0, item.quantity - (item.returnedQuantity ?? 0));
+}
+
+function isReturnable(item: BookingItem): boolean {
+  return item.productExists !== false && remainingQty(item) > 1e-9;
+}
+
 interface HistoryTabProps {
   groupId: string;
   isViewer: boolean;
@@ -24,7 +33,6 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
   const [returnError, setReturnError] = useState<string | null>(null);
   const [returnConfirm, setReturnConfirm] = useState(false);
   const [returnSuccess, setReturnSuccess] = useState(false);
-  const submittedReturns = useRef<Set<string>>(new Set());
   const returnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -33,15 +41,24 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
   }, [groupId]);
 
   const groupedByDate = useMemo(() => {
-    const allSource = isViewer ? bookings.filter((b) => b.userId === user?.uid) : bookings;
-    const returnMap = new Map<string, Booking>();
+    // Viewer sehen ihre eigenen Abbuchungen samt aller Rückbuchungen dazu – auch wenn
+    // ein Admin zurückgebucht hat
+    const ownIds = new Set(bookings.filter((b) => b.userId === user?.uid).map((b) => b.id));
+    const allSource = isViewer
+      ? bookings.filter((b) => b.userId === user?.uid || (b.originalBookingId && ownIds.has(b.originalBookingId)))
+      : bookings;
+    const returnMap = new Map<string, Booking[]>();
     allSource.forEach((b) => {
-      if (b.type === "return" && b.originalBookingId) returnMap.set(b.originalBookingId, b);
+      if (b.type !== "return" || !b.originalBookingId) return;
+      const list = returnMap.get(b.originalBookingId) ?? [];
+      list.push(b);
+      returnMap.set(b.originalBookingId, list);
     });
+    returnMap.forEach((list) => list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()));
     const source = allSource.filter((b) => b.type !== "return");
     const dateMap = new Map<string, {
       key: string; label: string; totalCount: number;
-      persons: Map<string, { userId: string; name: string; initials: string; entries: Array<{ booking: Booking; number: number; returnBooking?: Booking }> }>;
+      persons: Map<string, { userId: string; name: string; initials: string; entries: Array<{ booking: Booking; number: number; returnBookings: Booking[] }> }>;
     }>();
     source.forEach((b, index) => {
       const d = b.createdAt;
@@ -55,7 +72,7 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
       if (!dateEntry.persons.has(b.userId)) {
         dateEntry.persons.set(b.userId, { userId: b.userId, name: personName, initials: personInitials, entries: [] });
       }
-      dateEntry.persons.get(b.userId)!.entries.push({ booking: b, number: source.length - index, returnBooking: returnMap.get(b.id) });
+      dateEntry.persons.get(b.userId)!.entries.push({ booking: b, number: source.length - index, returnBookings: returnMap.get(b.id) ?? [] });
     });
     return Array.from(dateMap.values())
       .sort((a, b) => b.key.localeCompare(a.key))
@@ -79,9 +96,8 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
     });
 
   const openReturn = (b: Booking) => {
-    if (submittedReturns.current.has(b.id)) return;
     const qtys: Record<string, number> = {};
-    b.items.forEach((item) => { qtys[item.productId] = item.quantity; });
+    b.items.filter(isReturnable).forEach((item) => { qtys[item.productId] = remainingQty(item); });
     setReturnBooking(b);
     setReturnQtys(qtys);
     setReturnError(null);
@@ -94,18 +110,16 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
   };
 
   const handleReturn = async () => {
-    if (!returnBooking || returning || !user) return;
-    if (submittedReturns.current.has(returnBooking.id)) return;
-    submittedReturns.current.add(returnBooking.id);
+    if (!returnBooking || returning || returnSuccess || !user) return;
     setReturning(true);
     try {
-      const filteredItems = returnBooking.items.filter((item) => (returnQtys[item.productId] ?? 0) > 0);
-      const bookingItems: BookingItem[] = filteredItems.map((item) => ({ ...item, quantity: returnQtys[item.productId] }));
-      await createReturnBooking(returnBooking.id, bookingItems);
+      const items = returnBooking.items
+        .filter((item) => isReturnable(item) && (returnQtys[item.productId] ?? 0) > 0)
+        .map((item) => ({ productId: item.productId, quantity: returnQtys[item.productId] }));
+      await createReturnBooking(returnBooking.id, items);
       setReturnSuccess(true);
       returnTimerRef.current = setTimeout(closeReturn, 1200);
     } catch (e) {
-      submittedReturns.current.delete(returnBooking.id);
       setReturnError(e instanceof Error ? e.message : "Fehler beim Zurückbuchen.");
       setReturnConfirm(false);
     } finally {
@@ -131,25 +145,37 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
               </div>
               <p className="text-[13px] text-[#64748b] leading-normal m-0">Passe die Mengen an und bestätige die Rückbuchung.</p>
               <div className="flex flex-col gap-2.5">
-                {returnBooking.items.map((item) => (
-                  <div key={item.productId} className="flex items-center justify-between gap-3 bg-[#f8fafc] rounded-xl px-3.5 py-2.5">
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-[13px] font-semibold text-[#0f172a]">{item.productName}</span>
-                      <span className="text-[11px] text-[#94a3b8]">max. {item.quantity} {item.unit}</span>
+                {returnBooking.items.map((item, idx) => {
+                  const remaining = remainingQty(item);
+                  if (!isReturnable(item)) {
+                    return (
+                      <div key={item.productId ?? `idx-${idx}`} className="flex items-center justify-between gap-3 bg-[#f8fafc] rounded-xl px-3.5 py-2.5 opacity-60">
+                        <span className="text-[13px] font-semibold text-[#0f172a]">{item.productName}</span>
+                        <span className="text-[11px] text-[#94a3b8] shrink-0">{item.productExists === false ? "Produkt gelöscht" : "bereits zurück"}</span>
+                      </div>
+                    );
+                  }
+                  const current = returnQtys[item.productId] ?? 0;
+                  return (
+                    <div key={item.productId} className="flex items-center justify-between gap-3 bg-[#f8fafc] rounded-xl px-3.5 py-2.5">
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[13px] font-semibold text-[#0f172a]">{item.productName}</span>
+                        <span className="text-[11px] text-[#94a3b8]">max. {remaining} {item.unit}{(item.returnedQuantity ?? 0) > 0 ? ` · ${item.returnedQuantity} schon zurück` : ""}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button className="w-11 h-11 rounded-lg bg-[#e2e8f0] border-none cursor-pointer flex items-center justify-center" onClick={() => setReturnQtys((q) => ({ ...q, [item.productId]: Math.max(0, current - 1) }))}><Minus size={13} /></button>
+                        <span className="text-[16px] font-bold text-[#0f172a] min-w-[24px] text-center">{current}</span>
+                        <button className="w-11 h-11 rounded-lg bg-[#e2e8f0] border-none cursor-pointer flex items-center justify-center" onClick={() => setReturnQtys((q) => ({ ...q, [item.productId]: Math.min(remaining, current + 1) }))}><Plus size={13} /></button>
+                        <span className="text-xs text-[#64748b] min-w-[28px]">{item.unit}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button className="w-11 h-11 rounded-lg bg-[#e2e8f0] border-none cursor-pointer flex items-center justify-center" onClick={() => setReturnQtys((q) => ({ ...q, [item.productId]: Math.max(0, (q[item.productId] ?? item.quantity) - 1) }))}><Minus size={13} /></button>
-                      <span className="text-[16px] font-bold text-[#0f172a] min-w-[24px] text-center">{returnQtys[item.productId] ?? item.quantity}</span>
-                      <button className="w-11 h-11 rounded-lg bg-[#e2e8f0] border-none cursor-pointer flex items-center justify-center" onClick={() => setReturnQtys((q) => ({ ...q, [item.productId]: Math.min(item.quantity, (q[item.productId] ?? item.quantity) + 1) }))}><Plus size={13} /></button>
-                      <span className="text-xs text-[#64748b] min-w-[28px]">{item.unit}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="flex gap-2.5">
                 <button className="flex-1 bg-[#f1f5f9] border-none rounded-xl py-[13px] text-sm font-semibold text-[#0f172a] cursor-pointer" onClick={closeReturn}>Abbrechen</button>
                 <button className="flex-1 bg-[#2C2926] border-none rounded-xl py-[13px] text-sm font-bold text-white cursor-pointer" onClick={() => setReturnConfirm(true)}
-                  disabled={returnBooking.items.every((i) => (returnQtys[i.productId] ?? i.quantity) === 0)}>Weiter</button>
+                  disabled={returnBooking.items.every((i) => !isReturnable(i) || (returnQtys[i.productId] ?? 0) === 0)}>Weiter</button>
               </div>
             </>
           ) : (
@@ -161,11 +187,11 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
               <p className="text-[13px] text-[#64748b] leading-normal m-0">Folgende Gegenstände werden zurückgebucht und der Lagerbestand wiederhergestellt:</p>
               <div className="flex flex-col gap-2.5">
                 {returnBooking.items
-                  .filter((i) => (returnQtys[i.productId] ?? i.quantity) > 0)
+                  .filter((i) => isReturnable(i) && (returnQtys[i.productId] ?? 0) > 0)
                   .map((item) => (
                     <div key={item.productId} className="flex items-center justify-between gap-3 bg-[#f8fafc] rounded-xl px-3.5 py-2.5">
                       <span className="text-[13px] font-semibold text-[#0f172a]">{item.productName}</span>
-                      <span className="text-sm font-bold text-[#2C2926]">{returnQtys[item.productId] ?? item.quantity} {item.unit}</span>
+                      <span className="text-sm font-bold text-[#2C2926]">{returnQtys[item.productId]} {item.unit}</span>
                     </div>
                   ))}
               </div>
@@ -216,8 +242,10 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
                           <div className="w-6 h-6 rounded-full bg-[#2C2926] text-white flex items-center justify-center text-[10px] font-bold shrink-0">{person.initials}</div>
                           <span className="text-xs font-bold text-c-text-2">{person.name}</span>
                         </div>
-                        {person.entries.map(({ booking: b, number, returnBooking: rb }) => {
+                        {person.entries.map(({ booking: b, number, returnBookings }) => {
                           const isOpen = expandedId === b.id;
+                          const canReturn = !b.isReturned && b.items.some(isReturnable);
+                          const anyReturned = returnBookings.length > 0;
                           const timeStr = b.createdAt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
                           return (
                             <div key={b.id} className="bg-c-surface-2 rounded-[10px]">
@@ -232,15 +260,19 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
                                     <ChevronDown size={16} color="var(--c-text-3)" style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
                                   </div>
                                 </button>
-                                {(rb || submittedReturns.current.has(b.id))
-                                  ? <span className="text-[13px] font-semibold text-[#16a34a] bg-[#dcfce7] rounded-[11px] px-2.5 h-11 shrink-0 mx-2 whitespace-nowrap flex items-center gap-1.5"><Undo2 size={18} color="#16a34a" /> zurück</span>
-                                  : <button className="bg-[#2C2926] border-none rounded-[11px] cursor-pointer w-11 h-11 flex items-center justify-center shrink-0 mx-2" onClick={() => openReturn(b)}><Undo2 size={18} color="#fff" /></button>
-                                }
+                                {canReturn ? (
+                                  <>
+                                    {anyReturned && <span className="text-[11px] font-semibold text-[#16a34a] bg-[#dcfce7] rounded-[8px] px-2 py-1 shrink-0 whitespace-nowrap">teilweise</span>}
+                                    <button className="bg-[#2C2926] border-none rounded-[11px] cursor-pointer w-11 h-11 flex items-center justify-center shrink-0 mx-2" onClick={() => openReturn(b)}><Undo2 size={18} color="#fff" /></button>
+                                  </>
+                                ) : anyReturned || b.isReturned ? (
+                                  <span className="text-[13px] font-semibold text-[#16a34a] bg-[#dcfce7] rounded-[11px] px-2.5 h-11 shrink-0 mx-2 whitespace-nowrap flex items-center gap-1.5"><Undo2 size={18} color="#16a34a" /> zurück</span>
+                                ) : null}
                               </div>
                               {isOpen && (
                                 <div className="border-t border-c-border-2 px-3 pt-2 pb-2.5 flex flex-col">
                                   {b.items.map((item, idx) => (
-                                    <div key={item.productId} className="flex justify-between items-center gap-2 py-2" style={{ borderBottom: idx < b.items.length - 1 ? "1px solid var(--c-border-2)" : "none" }}>
+                                    <div key={item.productId ?? `idx-${idx}`} className="flex justify-between items-center gap-2 py-2" style={{ borderBottom: idx < b.items.length - 1 ? "1px solid var(--c-border-2)" : "none" }}>
                                       <div className="flex flex-col gap-0.5 min-w-0">
                                         <span className="text-[13px] text-c-text-1 font-medium">{item.productName}</span>
                                         <span className="flex items-center gap-[3px] text-[11px] text-[#2C2926] font-semibold overflow-hidden text-ellipsis whitespace-nowrap">
@@ -254,19 +286,19 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
                                       <span className="text-[13px] font-bold text-[#2C2926] shrink-0">{item.quantity} {item.unit}</span>
                                     </div>
                                   ))}
-                                  {rb && (
-                                    <div className="mt-2 border-t border-[#86efac] pt-2 flex flex-col gap-1">
+                                  {returnBookings.map((rb) => (
+                                    <div key={rb.id} className="mt-2 border-t border-[#86efac] pt-2 flex flex-col gap-1">
                                       <div className="text-[11px] font-bold text-[#16a34a] mb-0.5">
-                                        <Undo2 size={11} className="inline align-middle mr-1" /> Zurückgebucht um {rb.createdAt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr
+                                        <Undo2 size={11} className="inline align-middle mr-1" /> Zurückgebucht {rb.createdAt.toLocaleDateString("de-DE") === b.createdAt.toLocaleDateString("de-DE") ? "" : `am ${rb.createdAt.toLocaleDateString("de-DE")} `}um {rb.createdAt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr{rb.userId !== b.userId ? ` von ${rb.userDisplayName || rb.userEmail}` : ""}
                                       </div>
-                                      {rb.items.map((item) => (
-                                        <div key={item.productId} className="flex justify-between items-center py-0.5">
+                                      {rb.items.map((item, idx) => (
+                                        <div key={item.productId ?? `idx-${idx}`} className="flex justify-between items-center py-0.5">
                                           <span className="text-xs text-[#15803d]">{item.productName}</span>
                                           <span className="text-xs font-bold text-[#16a34a]">+{item.quantity} {item.unit}</span>
                                         </div>
                                       ))}
                                     </div>
-                                  )}
+                                  ))}
                                 </div>
                               )}
                             </div>

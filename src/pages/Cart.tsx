@@ -23,6 +23,9 @@ export default function Cart({ navigate: _navigate }: CartProps): React.ReactEle
   const armTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const itemsRef    = React.useRef(items);
   itemsRef.current  = items;
+  // Buchungs-ID je Warenkorb-Inhalt: schlägt eine Abbuchung mit unklarem Ausgang fehl
+  // (z.B. Timeout), nutzt der erneute Versuch dieselbe ID und der Server bucht nicht doppelt.
+  const pendingBookingRef = React.useRef<{ id: string; signature: string } | null>(null);
 
   // Reset submitted guard when new items are added after a booking
   React.useEffect(() => {
@@ -48,21 +51,31 @@ export default function Cart({ navigate: _navigate }: CartProps): React.ReactEle
     setError(null);
     try {
       const snapshot = [...itemsRef.current];
+      const signature = snapshot.map((i) => `${i.productId}:${i.cartQuantity}`).sort().join("|");
+      if (pendingBookingRef.current?.signature !== signature) {
+        pendingBookingRef.current = { id: crypto.randomUUID(), signature };
+      }
       await createBooking(
         user.uid,
         user.displayName ?? user.email ?? "Unbekannt",
         user.email ?? "",
-        snapshot
+        snapshot,
+        pendingBookingRef.current.id
       );
+      pendingBookingRef.current = null;
       const totalQty = snapshot.reduce((s, i) => s + i.cartQuantity, 0);
       clearCart();
       setSuccess({ positions: snapshot.length, total: totalQty });
     } catch (err) {
       setSubmitted(false);
       const message = err instanceof Error ? err.message : "";
-      setError(message.includes("Nicht genügend Bestand")
-        ? "Der Lagerbestand hat sich geändert. Mindestens ein Artikel ist nicht mehr in der gewünschten Menge verfügbar."
-        : "Abbuchung fehlgeschlagen. Bitte versuche es erneut.");
+      if (message.startsWith("Nicht genügend Bestand") || message.startsWith("Produkt nicht mehr vorhanden")) {
+        setError(`${message}. Bitte passe den Warenkorb an.`);
+      } else if (err instanceof TypeError) {
+        setError("Keine Verbindung zum Server. Bitte erneut versuchen – es wird nicht doppelt abgebucht.");
+      } else {
+        setError("Abbuchung fehlgeschlagen. Bitte versuche es erneut.");
+      }
     } finally {
       setBooking(false);
     }

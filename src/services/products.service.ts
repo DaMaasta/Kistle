@@ -156,18 +156,26 @@ export async function createProduct(
   }
 }
 
+// Nur die übergebenen Felder werden geändert. Bei einer Bestandsänderung sollte
+// expectedQuantity den Bestand enthalten, auf dem die Bearbeitung beruht: hat sich der
+// Bestand inzwischen (z.B. durch eine Abbuchung) geändert, lehnt der Server mit 409 ab,
+// statt die Abbuchung still zu überschreiben.
 export async function updateProduct(
   productId: string,
   _userId: string,
   _userEmail: string,
-  data: Partial<Omit<Product, 'id' | 'spaceId' | 'createdAt'>>
+  data: Partial<Omit<Product, 'id' | 'spaceId' | 'createdAt'>>,
+  options: { expectedQuantity?: number } = {}
 ): Promise<void> {
   store.setUpdate(productId, data);
   if (data.imageUrl) void setCachedImage(productId, data.imageUrl);
   try {
-    await api.put(`/products/${productId}`, data);
+    await api.put(`/products/${productId}`, { ...data, ...options });
   } catch (err) {
-    reportError('Änderung konnte nicht gespeichert werden');
+    const message = err instanceof Error ? err.message : '';
+    reportError(message.startsWith('Der Bestand wurde inzwischen geändert')
+      ? message
+      : 'Änderung konnte nicht gespeichert werden');
     throw err;
   } finally {
     store.clearUpdate(productId);
@@ -187,15 +195,6 @@ export async function deleteProduct(productId: string): Promise<void> {
     store.clearDelete(productId);
     store.triggerReload();
   }
-}
-
-export async function updateQuantity(
-  productId: string,
-  userId: string,
-  userEmail: string,
-  quantity: number
-): Promise<void> {
-  await updateProduct(productId, userId, userEmail, { quantity });
 }
 
 export async function uploadProductImage(productId: string, file: File): Promise<string> {

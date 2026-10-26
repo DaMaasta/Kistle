@@ -74,10 +74,16 @@ export default function ProductDetail({ navigate, params }: ProductDetailProps):
     setSaving(true);
     setSaveSuccess(false);
     try {
-      await updateProduct(product.id, user.uid, user.email ?? "", {
-        name: name.trim(), description: description.trim(), quantity, unit,
-        ...(color ? { color } : {}),
-      });
+      const changes: Partial<Product> = {};
+      if (name.trim() !== product.name) changes.name = name.trim();
+      if (description.trim() !== product.description) changes.description = description.trim();
+      if (unit !== product.unit) changes.unit = unit;
+      if (color !== (product.color ?? "")) changes.color = color;
+      if (quantity !== product.quantity) changes.quantity = quantity;
+      if (Object.keys(changes).length > 0) {
+        await updateProduct(product.id, user.uid, user.email ?? "", changes,
+          changes.quantity !== undefined ? { expectedQuantity: product.quantity } : {});
+      }
       if (imageFile) await uploadProductImage(product.id, imageFile);
       setSaveSuccess(true);
       setTimeout(() => navigate("BoxDetail", { box, place: place ?? null }), 800);

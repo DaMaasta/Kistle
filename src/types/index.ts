@@ -81,6 +81,10 @@ export interface BookingItem {
   boxNumber?: number | null;
   parentId: string | null;
   parentName: string;
+  /** Summe aller Rückbuchungen zu dieser Position (nur bei Abbuchungen) */
+  returnedQuantity?: number;
+  /** false, wenn das Produkt inzwischen gelöscht wurde – dann nicht rückbuchbar */
+  productExists?: boolean;
 }
 
 export interface Booking {

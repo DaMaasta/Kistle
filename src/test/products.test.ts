@@ -29,7 +29,6 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  updateQuantity,
   uploadProductImage,
   applyProductQuantityUpdates,
 } from '../services/products.service';
@@ -188,11 +187,17 @@ describe('products.service', () => {
     });
   });
 
-  describe('updateQuantity', () => {
-    it('delegates to updateProduct with quantity field', async () => {
+  describe('updateProduct mit Bestandsänderung', () => {
+    it('sends expectedQuantity so the server can detect concurrent bookings', async () => {
       vi.mocked(api.put).mockResolvedValue({});
-      await updateQuantity('p1', 'u1', 'test@test.de', 42);
-      expect(api.put).toHaveBeenCalledWith('/products/p1', { quantity: 42 });
+      await updateProduct('p1', 'u1', 'test@test.de', { quantity: 42 }, { expectedQuantity: 5 });
+      expect(api.put).toHaveBeenCalledWith('/products/p1', { quantity: 42, expectedQuantity: 5 });
+    });
+
+    it('shows the conflict message when the stock changed meanwhile', async () => {
+      vi.mocked(api.put).mockRejectedValue(new Error('Der Bestand wurde inzwischen geändert. Bitte neu laden und erneut speichern.'));
+      await expect(updateProduct('p1', 'u1', 'test@test.de', { quantity: 42 }, { expectedQuantity: 5 })).rejects.toThrow();
+      expect(reportError).toHaveBeenCalledWith('Der Bestand wurde inzwischen geändert. Bitte neu laden und erneut speichern.');
     });
   });
 

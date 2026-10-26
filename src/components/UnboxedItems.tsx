@@ -31,6 +31,8 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
   const [imageFile, setImageFile]         = useState<File | null>(null);
   const [preview, setPreview]             = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+  // Stand des Produkts beim Öffnen des Formulars – Grundlage für "nur Geändertes speichern"
+  const [editOriginal, setEditOriginal]   = useState<Product | null>(null);
   const [saving, setSaving]               = useState(false);
   const [deleteId, setDeleteId]           = useState<string | null>(null);
   const [hoveredId, setHoveredId]         = useState<string | null>(null);
@@ -51,11 +53,13 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
     setPreview(null);
     setShowForm(false);
     setEditProductId(null);
+    setEditOriginal(null);
     setDeleteId(null);
   };
 
   const startEdit = (p: Product) => {
     setEditProductId(p.id);
+    setEditOriginal(p);
     setForm({ name: p.name, description: p.description, quantity: p.quantity, unit: p.unit });
     setExistingImageUrl(p.imageUrl);
     setPreview(p.imageUrl);
@@ -75,11 +79,16 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
     if (!form.name.trim() || !user || saving) return;
     setSaving(true);
     try {
-      if (editProductId) {
-        await updateProduct(editProductId, user.uid, user.email ?? "", {
-          name: form.name.trim(), description: form.description.trim(),
-          quantity: form.quantity, unit: form.unit,
-        });
+      if (editProductId && editOriginal) {
+        const changes: Partial<Product> = {};
+        if (form.name.trim() !== editOriginal.name) changes.name = form.name.trim();
+        if (form.description.trim() !== editOriginal.description) changes.description = form.description.trim();
+        if (form.unit !== editOriginal.unit) changes.unit = form.unit;
+        if (form.quantity !== editOriginal.quantity) changes.quantity = form.quantity;
+        if (Object.keys(changes).length > 0) {
+          await updateProduct(editProductId, user.uid, user.email ?? "", changes,
+            changes.quantity !== undefined ? { expectedQuantity: editOriginal.quantity } : {});
+        }
         if (imageFile) await uploadProductImage(editProductId, imageFile);
       } else {
         const id = await createProduct(space.id, user.uid, user.email ?? "", {

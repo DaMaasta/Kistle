@@ -26,13 +26,16 @@ const store = createCachedStore<RawBooking, Booking>({
   sort: sortBookings,
 });
 
+// bookingId sollte bei einer Wiederholung derselben Abbuchung gleich bleiben: der Server
+// erkennt sie dann als bereits verarbeitet und bucht nicht ein zweites Mal ab.
 export async function createBooking(
   _userId: string,
   _userDisplayName: string,
   _userEmail: string,
-  cartItems: CartItem[]
+  cartItems: CartItem[],
+  bookingId: string = crypto.randomUUID()
 ): Promise<string> {
-  const id = crypto.randomUUID();
+  const id = bookingId;
   const items: BookingItem[] = cartItems.map(i => ({
     productId:   i.productId,
     productName: i.productName,
