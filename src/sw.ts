@@ -24,6 +24,16 @@ registerRoute(
   })
 );
 
+// Produktfotos (/api/images/<hash>.jpg) ändern sich nie unter derselben URL: einmal laden,
+// dauerhaft im App-Cache halten – übersteht Browser-Cache-Räumung und funktioniert offline.
+registerRoute(
+  ({ url, request }) => url.pathname.startsWith('/api/images/') && request.method === 'GET',
+  new CacheFirst({
+    cacheName: 'product-images',
+    plugins: [new ExpirationPlugin({ maxEntries: 1000, maxAgeSeconds: 60 * 60 * 24 * 365, purgeOnQuotaError: true })],
+  })
+);
+
 self.addEventListener('push', (event) => {
   const data = event.data?.json() ?? { title: 'Kistle', body: 'Neue Benachrichtigung' };
   event.waitUntil(
