@@ -134,13 +134,29 @@ export async function getSpaceContentCount(
   return api.get(`/spaces/${spaceId}/content-count`);
 }
 
-export async function joinGroup(
-  spaceId: string,
-  _userId: string,
-  _userEmail: string,
-  _userDisplayName: string
-): Promise<void> {
-  await api.post(`/spaces/${spaceId}/join`, {});
+export async function joinGroup(spaceId: string, token: string): Promise<void> {
+  await api.post(`/spaces/${spaceId}/join`, { token });
+}
+
+/** Erzeugt einen neuen Einladungslink; alle bisherigen Links werden ungültig. */
+export async function rotateInviteToken(spaceId: string): Promise<string> {
+  const { inviteToken } = await api.post<{ inviteToken: string }>(`/spaces/${spaceId}/invite-token`, {});
+  return inviteToken;
+}
+
+export function buildInviteUrl(groupId: string, token: string): string {
+  return `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(groupId)}&t=${encodeURIComponent(token)}`;
+}
+
+export function parseInviteUrl(raw: string): { groupId: string; token: string } | null {
+  try {
+    const url = new URL(raw);
+    const groupId = url.searchParams.get("invite");
+    const token = url.searchParams.get("t");
+    return groupId && token ? { groupId, token } : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function regenerateAccessCode(spaceId: string, length: number): Promise<void> {

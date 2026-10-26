@@ -4,9 +4,13 @@ const pool = require('../db');
 const auth = require('../middleware');
 const { broadcast } = require('../ws');
 const multer = require('multer');
+const { sendDbError } = require('../dbErrors');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const {
+  GROUP_JOIN,
+  HAS_GROUP_ACCESS,
   READ_ROLES,
   WRITE_ROLES,
   getSpaceAccess,
@@ -17,7 +21,8 @@ const {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, process.env.DATA_PATH + '/images'),
-  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
+  // UUID statt Zeitstempel: zwei Uploads in derselben Millisekunde überschrieben sich
+  filename: (req, file, cb) => cb(null, crypto.randomUUID() + path.extname(file.originalname).toLowerCase()),
 });
 const upload = multer({
   storage,
@@ -66,12 +71,10 @@ router.get('/', auth, async (req, res) => {
       const ids = spaceIds.split(',').filter(Boolean);
       if (ids.length > 200) return res.status(400).json({ error: 'Zu viele Lagerorte' });
       ({ rows } = await pool.query(
-        `SELECT DISTINCT p.* FROM products p
+        `SELECT p.* FROM products p
          JOIN spaces s ON s.id = p.space_id
-         LEFT JOIN space_members sm ON sm.space_id = s.id AND sm.user_id = $1
-         LEFT JOIN space_members sm_parent ON sm_parent.space_id = s.parent_id AND sm_parent.user_id = $1
-         WHERE p.space_id = ANY($2)
-         AND (s.owner_id = $1 OR sm.user_id = $1 OR sm_parent.user_id = $1)
+         ${GROUP_JOIN}
+         WHERE p.space_id = ANY($2) AND ${HAS_GROUP_ACCESS}
          ORDER BY p.name ASC`,
         [req.user.uid, ids]
       ));
@@ -81,11 +84,10 @@ router.get('/', auth, async (req, res) => {
       ({ rows } = await pool.query('SELECT * FROM products WHERE space_id=$1 ORDER BY name ASC', [spaceId]));
     } else {
       ({ rows } = await pool.query(
-        `SELECT DISTINCT p.* FROM products p
+        `SELECT p.* FROM products p
          JOIN spaces s ON s.id = p.space_id
-         LEFT JOIN space_members sm ON sm.space_id = s.id AND sm.user_id = $1
-         LEFT JOIN space_members sm_parent ON sm_parent.space_id = s.parent_id AND sm_parent.user_id = $1
-         WHERE s.owner_id = $1 OR sm.user_id = $1 OR sm_parent.user_id = $1
+         ${GROUP_JOIN}
+         WHERE ${HAS_GROUP_ACCESS}
          ORDER BY p.name ASC`,
         [req.user.uid]
       ));
@@ -119,8 +121,7 @@ router.post('/', auth, async (req, res) => {
     res.json({ id: productId });
     broadcast('products', { spaceId });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Fehler beim Erstellen' });
+    sendDbError(res, err, 'Fehler beim Erstellen');
   }
 });
 
@@ -190,11 +191,7 @@ router.put('/:id', auth, async (req, res) => {
     res.json({ success: true, product: mapProduct(rows[0]) });
     broadcast('products', { productId: req.params.id });
   } catch (err) {
-    if (err.code === '23514' || err.code === '23502') {
-      return res.status(400).json({ error: 'Ungültige Werte' });
-    }
-    console.error(err);
-    res.status(500).json({ error: 'Fehler beim Updaten' });
+    sendDbError(res, err, 'Fehler beim Updaten');
   }
 });
 

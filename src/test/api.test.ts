@@ -73,6 +73,42 @@ describe('api config', () => {
       fetchSpy.mockRestore();
     });
 
+    it('401 ohne Token (falsches Login-Passwort) zeigt die Fehlermeldung statt neu zu laden', async () => {
+      const reloadMock = vi.fn();
+      Object.defineProperty(window, 'location', {
+        value: { reload: reloadMock },
+        writable: true,
+      });
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten' }), { status: 401 })
+      );
+
+      const { api } = await import('../config/api');
+      await expect(api.post('/auth/login', { email: 'a@b.de', password: 'x' })).rejects.toThrow('Ungültige Anmeldedaten');
+      expect(reloadMock).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+    });
+
+    it('403 (z.B. falsches aktuelles Passwort) loggt nicht aus', async () => {
+      setToken('valid-token');
+      const reloadMock = vi.fn();
+      Object.defineProperty(window, 'location', {
+        value: { reload: reloadMock },
+        writable: true,
+      });
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ error: 'Aktuelles Passwort ist falsch' }), { status: 403 })
+      );
+
+      const { api } = await import('../config/api');
+      await expect(api.post('/auth/change-password', {})).rejects.toThrow('Aktuelles Passwort ist falsch');
+      expect(isLoggedIn()).toBe(true);
+      expect(reloadMock).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+    });
+
     it('sends JSON body on POST', async () => {
       setToken('jwt');
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(

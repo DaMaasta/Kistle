@@ -73,7 +73,7 @@ export default function GroupDetail({ navigate, params }: GroupDetailProps): Rea
   return (
     <div style={styles.container}>
       {showInvite && (
-        <InviteSheet groupId={group.id} isOwner={isOwner} onClose={() => setShowInvite(false)} />
+        <InviteSheet groupId={group.id} inviteToken={group.inviteToken} isOwner={isOwner} onClose={() => setShowInvite(false)} />
       )}
 
       <div style={styles.groupHeader}>

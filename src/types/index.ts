@@ -20,6 +20,8 @@ export interface Space {
   color: string;
   isGroup: boolean;
   accessCode?: string;
+  /** Geheimnis für Einladungslinks; nur für Mitglieder, die einladen dürfen */
+  inviteToken?: string;
   folderId?: string | null;
   boxNumber?: number | null;
   createdAt: Date;

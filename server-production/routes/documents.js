@@ -5,10 +5,13 @@ const pool = require('../db');
 const auth = require('../middleware');
 const multer = require('multer');
 const path = require('path');
+const crypto = require('crypto');
+const { sendDbError } = require('../dbErrors');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, process.env.DATA_PATH + '/documents'),
-  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
+  // UUID statt Zeitstempel: zwei Uploads in derselben Millisekunde überschrieben sich
+  filename: (req, file, cb) => cb(null, crypto.randomUUID() + path.extname(file.originalname).toLowerCase()),
 });
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
@@ -100,7 +103,7 @@ router.post('/folders', auth, async (req, res) => {
     );
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: 'Fehler beim Erstellen' });
+    sendDbError(res, err, 'Fehler beim Erstellen');
   }
 });
 
@@ -114,16 +117,40 @@ router.put('/folders/:id', auth, async (req, res) => {
   }
 });
 
+// Löscht den Ordner samt Unterordnern und allen darin liegenden Dateien. Vorher blieben
+// die Dateien erhalten und tauchten (folder_id = NULL) im Hauptordner wieder auf.
 router.delete('/folders/:id', auth, async (req, res) => {
+  const client = await pool.connect();
   try {
-    const result = await pool.query(`DELETE FROM folders WHERE id=$1 AND owner_id=$2`, [req.params.id, req.user.uid]);
-    if (result.rowCount === 0) {
+    await client.query('BEGIN');
+    const owned = await client.query('SELECT 1 FROM folders WHERE id=$1 AND owner_id=$2 FOR UPDATE', [req.params.id, req.user.uid]);
+    if (owned.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(403).json({ error: 'Nicht berechtigt oder nicht gefunden' });
     }
-    res.json({ success: true });
+    const docs = await client.query(
+      `WITH RECURSIVE tree AS (
+         SELECT id FROM folders WHERE id = $1
+         UNION ALL
+         SELECT f.id FROM folders f JOIN tree t ON f.parent_id = t.id
+       )
+       DELETE FROM documents WHERE folder_id IN (SELECT id FROM tree)
+       RETURNING file_path`,
+      [req.params.id]
+    );
+    await client.query('DELETE FROM folders WHERE id=$1', [req.params.id]);
+    await client.query('COMMIT');
+    for (const row of docs.rows) {
+      const filename = path.basename(row.file_path || '');
+      if (filename) fs.unlink(path.join(process.env.DATA_PATH, 'documents', filename), () => {});
+    }
+    res.json({ success: true, deletedDocuments: docs.rowCount });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ error: 'Fehler beim Löschen' });
+  } finally {
+    client.release();
   }
 });
 

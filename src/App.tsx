@@ -18,7 +18,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import BoxLoader from "./components/BoxLoader";
 import KistleLogoOutline from "./components/KistleLogoOutline";
 import { useAuth } from "./contexts/AuthContext";
-import { getSpace, joinGroup } from "./services/spaces.service";
+import { getSpace, joinGroup, parseInviteUrl } from "./services/spaces.service";
 import type { Space, Product } from "./types";
 
 export type PageParamsMap = {
@@ -88,14 +88,14 @@ function parseHash(): { page: PageName; groupId?: string } {
   return { page: HASH_TO_PAGE[segment] ?? "Groups" };
 }
 
-function getPendingInvite(): string | null {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("invite");
+function getPendingInvite(): { groupId: string; token: string } | null {
+  return parseInviteUrl(window.location.href);
 }
 
 function clearInviteParam() {
   const url = new URL(window.location.href);
   url.searchParams.delete("invite");
+  url.searchParams.delete("t");
   window.history.replaceState(window.history.state, "", url.toString());
 }
 
@@ -109,7 +109,7 @@ export default function App(): React.ReactElement {
   const [currentPage, setCurrentPage] = useState<PageName>(getInitialPage);
   const [pageParams, setPageParams]   = useState<PageParamsMap[PageName]>({} as PageParamsMap[PageName]);
   const [navDir, setNavDir]           = useState<NavDirection>("lateral");
-  const [pendingInvite] = useState<string | null>(getPendingInvite);
+  const [pendingInvite] = useState(getPendingInvite);
   const [updateReady, setUpdateReady] = useState(false);
   const [minSplashDone, setMinSplashDone] = useState(false);
 
@@ -173,9 +173,9 @@ export default function App(): React.ReactElement {
   // Invite-Link handling — always clear the URL param, whether the space exists or not
   useEffect(() => {
     if (!user || !pendingInvite) return;
-    joinGroup(pendingInvite, user.uid, user.email ?? "", user.displayName ?? "")
-      .catch(() => { /* already member or error — continue anyway */ })
-      .then(() => getSpace(pendingInvite))
+    joinGroup(pendingInvite.groupId, pendingInvite.token)
+      .catch(() => { /* ungültiger Link oder Fehler — getSpace zeigt die Gruppe nur, wenn man Mitglied ist */ })
+      .then(() => getSpace(pendingInvite.groupId))
       .then((group) => {
         clearInviteParam();
         if (group) {

@@ -28,8 +28,10 @@ export async function logoutUser(): Promise<void> {
   window.location.reload();
 }
 
+// Der Server meldet beim Passwortwechsel alle Geräte ab und gibt diesem ein neues Token
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  await api.post('/auth/change-password', { currentPassword, newPassword });
+  const { token } = await api.post<{ token?: string }>('/auth/change-password', { currentPassword, newPassword });
+  if (token) setToken(token);
 }
 
 export async function deleteAccount(currentPassword: string): Promise<void> {

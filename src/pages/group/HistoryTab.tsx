@@ -69,10 +69,12 @@ export default function HistoryTab({ groupId, isViewer }: HistoryTabProps): Reac
       dateEntry.totalCount++;
       const personName = b.userDisplayName || b.userEmail;
       const personInitials = getInitials(personName) || personName[0]?.toUpperCase() || "?";
-      if (!dateEntry.persons.has(b.userId)) {
-        dateEntry.persons.set(b.userId, { userId: b.userId, name: personName, initials: personInitials, entries: [] });
+      // userId ist null, wenn das Konto inzwischen gelöscht wurde
+      const personKey = b.userId ?? `deleted:${personName}`;
+      if (!dateEntry.persons.has(personKey)) {
+        dateEntry.persons.set(personKey, { userId: personKey, name: personName, initials: personInitials, entries: [] });
       }
-      dateEntry.persons.get(b.userId)!.entries.push({ booking: b, number: source.length - index, returnBookings: returnMap.get(b.id) ?? [] });
+      dateEntry.persons.get(personKey)!.entries.push({ booking: b, number: source.length - index, returnBookings: returnMap.get(b.id) ?? [] });
     });
     return Array.from(dateMap.values())
       .sort((a, b) => b.key.localeCompare(a.key))

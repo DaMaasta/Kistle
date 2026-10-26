@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
-import { UserPlus, X, QrCode, Copy, ExternalLink, Mail } from "lucide-react";
+import { UserPlus, X, QrCode, Copy, ExternalLink, Mail, RefreshCw } from "lucide-react";
 import BottomSheet from "../../components/BottomSheet";
-import { addMember } from "../../services/spaces.service";
+import { addMember, buildInviteUrl, getSpace, rotateInviteToken } from "../../services/spaces.service";
 
 interface InviteSheetProps {
   groupId: string;
+  inviteToken?: string;
   isOwner: boolean;
   onClose: () => void;
 }
 
-export default function InviteSheet({ groupId, isOwner, onClose }: InviteSheetProps): React.ReactElement {
+export default function InviteSheet({ groupId, inviteToken, isOwner, onClose }: InviteSheetProps): React.ReactElement {
   const [inviteTab, setInviteTab] = useState<"qr" | "email">("qr");
   const [copied, setCopied] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -20,10 +21,27 @@ export default function InviteSheet({ groupId, isOwner, onClose }: InviteSheetPr
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const inviteInputRef = useRef<HTMLInputElement>(null);
 
-  const inviteUrl = `${window.location.origin}${window.location.pathname}?invite=${groupId}`;
+  const [token, setToken] = useState<string | undefined>(inviteToken);
+  const [rotateArmed, setRotateArmed] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  const inviteUrl = token ? buildInviteUrl(groupId, token) : "";
+
+  // Token fehlt z.B. in einem älteren Cache-Stand der Gruppe → frisch laden
+  useEffect(() => {
+    if (token) return;
+    void getSpace(groupId).then((space) => { if (space?.inviteToken) setToken(space.inviteToken); });
+  }, [groupId, token]);
+
+  const handleRotate = async () => {
+    if (!rotateArmed) { setRotateArmed(true); setTimeout(() => setRotateArmed(false), 3000); return; }
+    setRotateArmed(false);
+    setRotating(true);
+    try { setToken(await rotateInviteToken(groupId)); }
+    finally { setRotating(false); }
+  };
 
   useEffect(() => {
-    if (inviteTab !== "qr" || !qrCanvasRef.current) return;
+    if (inviteTab !== "qr" || !qrCanvasRef.current || !inviteUrl) return;
     let cancelled = false;
     // qrcode erst beim Öffnen der Einladung laden, nicht beim App-Start
     void import("qrcode").then(({ default: QRCodeLib }) => {
@@ -37,6 +55,7 @@ export default function InviteSheet({ groupId, isOwner, onClose }: InviteSheetPr
   }, [inviteTab, inviteUrl]);
 
   const handleCopyLink = async () => {
+    if (!inviteUrl) return;
     await navigator.clipboard.writeText(inviteUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -90,15 +109,21 @@ export default function InviteSheet({ groupId, isOwner, onClose }: InviteSheetPr
         <>
           <p style={s.sub}>QR-Code scannen oder Link teilen.</p>
           <div style={s.qrBox}><canvas ref={qrCanvasRef} style={{ borderRadius: 12 }} /></div>
-          <div style={s.linkRow}><span style={s.linkText} title={inviteUrl}>{inviteUrl}</span></div>
+          <div style={s.linkRow}><span style={s.linkText} title={inviteUrl}>{inviteUrl || "Link wird geladen…"}</span></div>
           <div style={s.actions}>
-            <button style={s.copyBtn} onClick={handleCopyLink}>
+            <button style={s.copyBtn} onClick={handleCopyLink} disabled={!inviteUrl}>
               <Copy size={14} /> {copied ? "Kopiert!" : "Link kopieren"}
             </button>
-            <button style={s.openBtn} onClick={() => window.open(inviteUrl, "_blank")}>
+            <button style={s.openBtn} onClick={() => inviteUrl && window.open(inviteUrl, "_blank")} disabled={!inviteUrl}>
               <ExternalLink size={14} /> Öffnen
             </button>
           </div>
+          {isOwner && (
+            <button style={{ ...s.openBtn, color: rotateArmed ? "#dc2626" : "var(--c-text-2)" }} onClick={handleRotate} disabled={rotating}>
+              <RefreshCw size={14} />
+              {rotating ? "Wird erneuert…" : rotateArmed ? "Nochmal tippen: alte Links werden ungültig" : "Neuen Link erzeugen"}
+            </button>
+          )}
         </>
       ) : (
         <>

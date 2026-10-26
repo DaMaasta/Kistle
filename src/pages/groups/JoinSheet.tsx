@@ -5,19 +5,11 @@ let jsQRPromise: Promise<typeof import("jsqr").default> | null = null;
 const loadJsQR = () => (jsQRPromise ??= import("jsqr").then((m) => m.default));
 import BottomSheet from "../../components/BottomSheet";
 import { useAuth } from "../../contexts/AuthContext";
-import { joinGroup, getSpace } from "../../services/spaces.service";
+import { joinGroup, getSpace, parseInviteUrl } from "../../services/spaces.service";
 import type { Space } from "../../types";
 
 type JoinStep = "choose" | "camera" | "uploading" | "joining" | "error";
 
-function extractGroupId(raw: string): string | null {
-  try {
-    const url = new URL(raw);
-    return url.searchParams.get("invite");
-  } catch {
-    return null;
-  }
-}
 
 interface JoinSheetProps {
   onClose: () => void;
@@ -45,18 +37,20 @@ export default function JoinSheet({ onClose, onJoined }: JoinSheetProps): React.
     onClose();
   }, [stopCamera, onClose]);
 
-  const handleGroupId = useCallback(async (groupId: string) => {
+  const handleInvite = useCallback(async ({ groupId, token }: { groupId: string; token: string }) => {
     if (!user) return;
     stopCamera();
     setJoinStep("joining");
     try {
-      await joinGroup(groupId, user.uid, user.email ?? "", user.displayName ?? "");
+      await joinGroup(groupId, token);
       const space = await getSpace(groupId);
       if (!space) { setJoinError("Ort nicht gefunden."); setJoinStep("error"); return; }
       close();
       onJoined(space);
-    } catch {
-      setJoinError("Fehler beim Beitreten. Versuche es erneut.");
+    } catch (err) {
+      setJoinError(err instanceof Error && err.message.startsWith("Einladung")
+        ? err.message
+        : "Fehler beim Beitreten. Versuche es erneut.");
       setJoinStep("error");
     }
   }, [user, stopCamera, close, onJoined]);
@@ -92,13 +86,13 @@ export default function JoinSheet({ onClose, onJoined }: JoinSheetProps): React.
       const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const code = jsQR(img.data, img.width, img.height);
       if (code) {
-        const groupId = extractGroupId(code.data);
-        if (groupId) { handleGroupId(groupId); return; }
+        const invite = parseInviteUrl(code.data);
+        if (invite) { handleInvite(invite); return; }
       }
       rafRef.current = requestAnimationFrame(scan);
     };
     rafRef.current = requestAnimationFrame(scan);
-  }, [handleGroupId]);
+  }, [handleInvite]);
 
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -120,19 +114,19 @@ export default function JoinSheet({ onClose, onJoined }: JoinSheetProps): React.
         setJoinStep("error");
         return;
       }
-      const groupId = extractGroupId(code.data);
-      if (!groupId) {
-        setJoinError("QR-Code enthält keinen gültigen Einladungslink.");
+      const invite = parseInviteUrl(code.data);
+      if (!invite) {
+        setJoinError("QR-Code enthält keinen gültigen Einladungslink. Alte Links ohne Sicherheitscode funktionieren nicht mehr – bitte um einen neuen.");
         setJoinStep("error");
         return;
       }
-      handleGroupId(groupId);
+      handleInvite(invite);
     };
     img.onerror = () => {
       setJoinError("Bild konnte nicht geladen werden.");
       setJoinStep("error");
     };
-  }, [handleGroupId]);
+  }, [handleInvite]);
 
   return (
     <BottomSheet onClose={close}>

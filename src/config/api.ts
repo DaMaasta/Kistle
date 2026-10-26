@@ -45,13 +45,15 @@ async function request<T>(
         body: formData ?? (body ? JSON.stringify(body) : undefined),
       });
 
-      if (res.status === 401) {
+      const data = await res.json().catch(() => ({}));
+
+      // Nur eine abgelaufene/ungültige Sitzung führt zum Ausloggen. Ohne Token (z.B. falsches
+      // Passwort beim Login) ist 401 eine normale Fehlermeldung für das Formular.
+      if (res.status === 401 && token) {
         clearToken();
         window.location.reload();
         throw new ApiError(401, 'Session abgelaufen');
       }
-
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new ApiError(res.status, data.error ?? `HTTP ${res.status}`);
       return data as T;
     } catch (err) {

@@ -1,9 +1,13 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const pool = require('../db');
 const auth = require('../middleware');
 const { broadcast } = require('../ws');
 const {
+  GROUP_JOIN,
+  GROUP_ROLE,
+  HAS_GROUP_ACCESS,
   READ_ROLES,
   WRITE_ROLES,
   ADMIN_ROLES,
@@ -11,6 +15,19 @@ const {
   hasRole,
   forbidden,
 } = require('../authorization');
+const { sendDbError } = require('../dbErrors');
+
+function newInviteToken() {
+  return crypto.randomBytes(24).toString('base64url');
+}
+
+// Vergleich in konstanter Zeit, damit sich der Token nicht zeichenweise erraten lässt
+function tokensMatch(expected, given) {
+  if (typeof expected !== 'string' || typeof given !== 'string') return false;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(given);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 const MANAGEABLE_ROLES = new Set(['admin', 'editor', 'viewer']);
 
@@ -33,6 +50,7 @@ function mapSpace(row) {
     };
     memberIds.push(m.userId);
   }
+  const role = normalizeRole(row.role);
   return {
     id: row.id,
     name: row.name,
@@ -48,7 +66,9 @@ function mapSpace(row) {
     updatedAt: row.updated_at,
     folderId: row.folder_id ?? null,
     boxNumber: row.box_number ?? null,
-    role: normalizeRole(row.role),
+    role,
+    // Einladungstoken nur für Mitglieder, die auch einladen dürfen
+    inviteToken: row.is_group && WRITE_ROLES.has(row.role) ? row.invite_token : undefined,
     memberIds,
     members,
   };
@@ -62,20 +82,18 @@ router.get('/', auth, async (req, res) => {
     if (parentIds) {
       const ids = parentIds.split(',').filter(Boolean);
       const result = await pool.query(
-        `SELECT s.*, COALESCE(sm.role, sm_parent.role) AS role FROM spaces s
-         LEFT JOIN space_members sm ON s.id = sm.space_id AND sm.user_id=$1
-         LEFT JOIN space_members sm_parent ON s.parent_id = sm_parent.space_id AND sm_parent.user_id=$1
-         WHERE s.parent_id = ANY($2) AND (sm.user_id=$1 OR sm_parent.user_id=$1)
+        `SELECT s.*, ${GROUP_ROLE} AS role FROM spaces s
+         ${GROUP_JOIN}
+         WHERE s.parent_id = ANY($2) AND ${HAS_GROUP_ACCESS}
          ORDER BY COALESCE(s.box_number, 99999) ASC, s.created_at ASC`,
         [req.user.uid, ids]
       );
       rows = result.rows;
     } else if (parentId !== undefined) {
       const result = await pool.query(
-        `SELECT s.*, COALESCE(sm.role, sm_parent.role) AS role FROM spaces s
-         LEFT JOIN space_members sm ON s.id = sm.space_id AND sm.user_id=$1
-         LEFT JOIN space_members sm_parent ON s.parent_id = sm_parent.space_id AND sm_parent.user_id=$1
-         WHERE s.parent_id=$2 AND (sm.user_id=$1 OR sm_parent.user_id=$1)
+        `SELECT s.*, ${GROUP_ROLE} AS role FROM spaces s
+         ${GROUP_JOIN}
+         WHERE s.parent_id=$2 AND ${HAS_GROUP_ACCESS}
          ORDER BY COALESCE(s.box_number, 99999) ASC, s.created_at ASC`,
         [req.user.uid, parentId || null]
       );
@@ -110,9 +128,10 @@ router.get('/', auth, async (req, res) => {
 // GET /spaces/:id
 router.get('/:id', auth, async (req, res) => {
   try {
+    // Mitgliederliste ist immer die der Gruppe (auch beim Abruf einer Box)
     const { rows } = await pool.query(
       `SELECT s.*,
-        COALESCE(sm_me.role, sm_parent.role) AS role,
+        ${GROUP_ROLE} AS role,
         COALESCE(json_agg(json_build_object(
           'userId', sm2.user_id,
           'displayName', u.display_name,
@@ -120,13 +139,12 @@ router.get('/:id', auth, async (req, res) => {
           'role', sm2.role
         )) FILTER (WHERE sm2.user_id IS NOT NULL), '[]') AS members_list
        FROM spaces s
-       LEFT JOIN space_members sm_me ON s.id = sm_me.space_id AND sm_me.user_id=$2
-       LEFT JOIN space_members sm_parent ON s.parent_id = sm_parent.space_id AND sm_parent.user_id=$2
-       LEFT JOIN space_members sm2 ON s.id = sm2.space_id
+       ${GROUP_JOIN}
+       LEFT JOIN space_members sm2 ON sm2.space_id = g.id
        LEFT JOIN users u ON sm2.user_id = u.uid
-       WHERE s.id=$1 AND (sm_me.user_id=$2 OR sm_parent.user_id=$2)
-       GROUP BY s.id, sm_me.role, sm_parent.role`,
-      [req.params.id, req.user.uid]
+       WHERE s.id=$2 AND ${HAS_GROUP_ACCESS}
+       GROUP BY s.id, g.owner_id, gm.role, gm.user_id`,
+      [req.user.uid, req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Nicht gefunden' });
     res.json(mapSpace(rows[0]));
@@ -161,9 +179,13 @@ router.post('/', auth, async (req, res) => {
   let client;
   try {
     if (!name?.trim()) return res.status(400).json({ error: 'Name fehlt' });
+    let ownerId = req.user.uid;
     if (parentId) {
       const parentAccess = await getSpaceAccess(req.user.uid, parentId);
       if (!hasRole(parentAccess, WRITE_ROLES)) return forbidden(res);
+      if (!parentAccess.is_group) return res.status(400).json({ error: 'Boxen können nur in Gruppen angelegt werden' });
+      // Boxen gehören dem Gruppenbesitzer; Rechte kommen ausschließlich aus der Gruppe
+      ownerId = parentAccess.owner_id;
     }
     // Duplicate check for groups
     if (isGroup) {
@@ -180,43 +202,51 @@ router.post('/', auth, async (req, res) => {
     const spaceId = id || (await pool.query('SELECT gen_random_uuid()::text AS id')).rows[0].id;
     client = await pool.connect();
     await client.query('BEGIN');
-    await client.query(
-      `INSERT INTO spaces (id, name, description, color, icon, owner_id, parent_id, type, access_code, is_group)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [spaceId, name, description || '', color || '#f97316', icon || '📦',
-       req.user.uid, parentId || null, type || 'box', accessCode || null, isGroup || false]
-    );
-    await client.query(
-      `INSERT INTO space_members (space_id, user_id, role) VALUES ($1,$2,'admin')`,
-      [spaceId, req.user.uid]
-    );
-    // Auto-assign box_number for boxes with a parent
+    let boxNumber = null;
     if (parentId) {
+      // Gruppe sperren, damit gleichzeitig angelegte Boxen nicht dieselbe Nummer bekommen
+      await client.query('SELECT id FROM spaces WHERE id=$1 FOR UPDATE', [parentId]);
       const maxRes = await client.query(
         'SELECT COALESCE(MAX(box_number), 0) AS max_num FROM spaces WHERE parent_id=$1',
         [parentId]
       );
-      const nextNum = parseInt(maxRes.rows[0].max_num) + 1;
-      await client.query('UPDATE spaces SET box_number=$1 WHERE id=$2', [nextNum, spaceId]);
+      boxNumber = parseInt(maxRes.rows[0].max_num, 10) + 1;
+    }
+    const group = !parentId;
+    await client.query(
+      `INSERT INTO spaces (id, name, description, color, icon, owner_id, parent_id, type, access_code, is_group, box_number, invite_token)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [spaceId, name, description || '', color || '#f97316', icon || '📦',
+       ownerId, parentId || null, type || 'box', accessCode || null, group, boxNumber,
+       group ? newInviteToken() : null]
+    );
+    if (group) {
+      await client.query(
+        `INSERT INTO space_members (space_id, user_id, role) VALUES ($1,$2,'admin')`,
+        [spaceId, req.user.uid]
+      );
     }
     await client.query('COMMIT');
     res.json({ id: spaceId });
     broadcast('spaces', { spaceId, parentId: parentId || null });
   } catch (err) {
-    if (client) await client.query('ROLLBACK');
-    console.error(err);
-    res.status(500).json({ error: 'Fehler beim Erstellen' });
+    if (client) await client.query('ROLLBACK').catch(() => {});
+    sendDbError(res, err, 'Fehler beim Erstellen');
   } finally {
     client?.release();
   }
 });
 
-// POST /spaces/:id/join
+// POST /spaces/:id/join  { token }
+// Beitritt nur mit dem aktuellen Einladungstoken der Gruppe (steht im Einladungslink).
 router.post('/:id/join', auth, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT id, is_group FROM spaces WHERE id=$1', [req.params.id]);
-    if (!rows.length) return res.status(404).json({ error: 'Nicht gefunden' });
-    if (!rows[0].is_group) return res.status(400).json({ error: 'Beitritt nur zu Gruppen möglich' });
+    const { rows } = await pool.query('SELECT id, is_group, invite_token FROM spaces WHERE id=$1', [req.params.id]);
+    const space = rows[0];
+    if (!space || !space.is_group || !tokensMatch(space.invite_token, req.body?.token)) {
+      // Keine Unterscheidung zwischen "gibt es nicht" und "falscher Token"
+      return res.status(403).json({ error: 'Einladung ungültig oder abgelaufen. Bitte um einen neuen Link.' });
+    }
     await pool.query(
       `INSERT INTO space_members (space_id, user_id, role)
        VALUES ($1,$2,'viewer')
@@ -224,9 +254,25 @@ router.post('/:id/join', auth, async (req, res) => {
       [req.params.id, req.user.uid]
     );
     res.json({ success: true });
+    broadcast('spaces', { spaceId: req.params.id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Fehler beim Beitreten' });
+  }
+});
+
+// POST /spaces/:id/invite-token — neuen Einladungslink erzeugen, alte werden ungültig
+router.post('/:id/invite-token', auth, async (req, res) => {
+  try {
+    const access = await getSpaceAccess(req.user.uid, req.params.id);
+    if (!hasRole(access, ADMIN_ROLES)) return forbidden(res);
+    if (!access.is_group) return res.status(400).json({ error: 'Nur Gruppen haben Einladungslinks' });
+    const token = newInviteToken();
+    await pool.query('UPDATE spaces SET invite_token=$1 WHERE id=$2', [token, req.params.id]);
+    res.json({ inviteToken: token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Fehler' });
   }
 });
 
@@ -243,6 +289,12 @@ router.put('/:id', auth, async (req, res) => {
       const folder = await pool.query('SELECT owner_id FROM folders WHERE id=$1', [folderId]);
       if (!folder.rows.length || folder.rows[0].owner_id !== req.user.uid) return forbidden(res);
     }
+    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+      return res.status(400).json({ error: 'Name darf nicht leer sein' });
+    }
+    if (boxNumber !== undefined && boxNumber !== null && !/^\d{1,6}$/.test(String(boxNumber))) {
+      return res.status(400).json({ error: 'Ungültige Boxnummer' });
+    }
     const fields = [];
     const vals = [];
     let i = 1;
@@ -252,43 +304,28 @@ router.put('/:id', auth, async (req, res) => {
     if (icon !== undefined)        { fields.push(`icon=$${i++}`);        vals.push(icon); }
     if (folderId !== undefined)     { fields.push(`folder_id=$${i++}`);    vals.push(folderId === null ? null : folderId); }
     if (accessCode !== undefined)  { fields.push(`access_code=$${i++}`); vals.push(accessCode); }
-    if (boxNumber !== undefined)   { fields.push(`box_number=$${i++}`);   vals.push(boxNumber === null ? null : parseInt(boxNumber)); }
+    if (boxNumber !== undefined)   { fields.push(`box_number=$${i++}`);   vals.push(boxNumber === null ? null : parseInt(boxNumber, 10)); }
     if (type !== undefined)        { fields.push(`type=$${i++}`);        vals.push(type); }
     if (fields.length === 0) return res.json({ success: true });
     fields.push(`updated_at=NOW()`);
-    vals.push(req.params.id, req.user.uid);
-    const result = await pool.query(
-      `UPDATE spaces SET ${fields.join(', ')}
-       WHERE id=$${i} AND (owner_id=$${i+1} OR id IN (
-         SELECT space_id FROM space_members WHERE user_id=$${i+1} AND role IN ('admin','editor')
-       ) OR parent_id IN (
-         SELECT space_id FROM space_members WHERE user_id=$${i+1} AND role IN ('admin','editor')
-       ))`,
-      vals
-    );
-    if (result.rowCount === 0) return forbidden(res);
+    vals.push(req.params.id);
+    await pool.query(`UPDATE spaces SET ${fields.join(', ')} WHERE id=$${i}`, vals);
     res.json({ success: true });
     broadcast('spaces', { spaceId: req.params.id });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Fehler beim Updaten' });
+    sendDbError(res, err, 'Fehler beim Updaten');
   }
 });
 
 // DELETE /spaces/:id
+// Gruppen: nur Admins; ihre Boxen und Produkte werden mitgelöscht (ON DELETE CASCADE).
+// Boxen: Editoren und Admins der Gruppe – wie beim Löschen von Produkten.
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const result = await pool.query(
-      `DELETE FROM spaces WHERE id=$1 AND (
-        owner_id=$2 OR id IN (
-          SELECT space_id FROM space_members WHERE user_id=$2 AND role IN ('admin')
-        ) OR parent_id IN (
-          SELECT space_id FROM space_members WHERE user_id=$2 AND role IN ('admin')
-        )
-      )`,
-      [req.params.id, req.user.uid]
-    );
-    if (result.rowCount === 0) return forbidden(res);
+    const access = await getSpaceAccess(req.user.uid, req.params.id);
+    if (!access) return res.status(404).json({ error: 'Nicht gefunden' });
+    if (!hasRole(access, access.is_group ? ADMIN_ROLES : WRITE_ROLES)) return forbidden(res);
+    await pool.query('DELETE FROM spaces WHERE id=$1', [req.params.id]);
     res.json({ success: true });
     broadcast('spaces', {});
   } catch (err) {
@@ -302,6 +339,7 @@ router.post('/:id/members', auth, async (req, res) => {
   const { userId, email, role } = req.body;
   const access = await getSpaceAccess(req.user.uid, req.params.id);
   if (!hasRole(access, ADMIN_ROLES)) return forbidden(res);
+  if (!access.is_group) return res.status(400).json({ error: 'Mitglieder gibt es nur in Gruppen' });
   const requestedRole = role || 'viewer';
   if (!MANAGEABLE_ROLES.has(requestedRole)) {
     return res.status(400).json({ error: 'Ungültige Rolle' });
@@ -324,8 +362,7 @@ router.post('/:id/members', auth, async (req, res) => {
     );
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Fehler' });
+    sendDbError(res, err, 'Fehler');
   }
 });
 
@@ -376,7 +413,7 @@ router.post('/:id/access-code', auth, async (req, res) => {
   if (!Number.isInteger(codeLength) || codeLength < 1 || codeLength > 12) {
     return res.status(400).json({ error: 'Ungültige Codelänge' });
   }
-  const code = Array.from({ length: codeLength }, () => String(Math.floor(Math.random() * 10))).join('');
+  const code = Array.from({ length: codeLength }, () => String(crypto.randomInt(10))).join('');
   try {
     const result = await pool.query('UPDATE spaces SET access_code=$1 WHERE id=$2 AND owner_id=$3', [code, req.params.id, req.user.uid]);
     if (result.rowCount === 0) return forbidden(res);

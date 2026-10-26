@@ -4,18 +4,22 @@ const READ_ROLES = new Set(['owner', 'admin', 'editor', 'viewer']);
 const WRITE_ROLES = new Set(['owner', 'admin', 'editor']);
 const ADMIN_ROLES = new Set(['owner', 'admin']);
 
+// Rechte hängen immer an der Gruppe: eine Box erbt die Rolle aus ihrer Gruppe
+// (Boxen sind nicht verschachtelt, parent_id einer Box ist immer die Gruppe).
+// Diese Fragmente nutzen auch die Listen-Abfragen in den Routen. Erwartet einen
+// Alias "s" für den Lagerort und $1 = uid.
+const GROUP_JOIN = `
+  JOIN spaces g ON g.id = CASE WHEN s.is_group THEN s.id ELSE s.parent_id END
+  LEFT JOIN space_members gm ON gm.space_id = g.id AND gm.user_id = $1`;
+const GROUP_ROLE = `CASE WHEN g.owner_id = $1 THEN 'owner' ELSE gm.role END`;
+const HAS_GROUP_ACCESS = `(g.owner_id = $1 OR gm.user_id IS NOT NULL)`;
+
 async function getSpaceAccess(uid, spaceId, client = pool) {
   const { rows } = await client.query(
-    `SELECT s.id, s.owner_id, s.parent_id,
-       CASE
-         WHEN s.owner_id = $1 THEN 'owner'
-         ELSE COALESCE(sm.role, sm_parent.role)
-       END AS role
+    `SELECT s.id, s.owner_id, s.parent_id, s.is_group, g.id AS group_id,
+       ${GROUP_ROLE} AS role
      FROM spaces s
-     LEFT JOIN space_members sm
-       ON sm.space_id = s.id AND sm.user_id = $1
-     LEFT JOIN space_members sm_parent
-       ON sm_parent.space_id = s.parent_id AND sm_parent.user_id = $1
+     ${GROUP_JOIN}
      WHERE s.id = $2`,
     [uid, spaceId]
   );
@@ -68,6 +72,9 @@ function forbidden(res) {
 }
 
 module.exports = {
+  GROUP_JOIN,
+  GROUP_ROLE,
+  HAS_GROUP_ACCESS,
   READ_ROLES,
   WRITE_ROLES,
   ADMIN_ROLES,
