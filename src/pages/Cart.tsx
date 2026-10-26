@@ -1,12 +1,19 @@
 import React, { useState } from "react";
 import type { CSSProperties } from "react";
-import Lottie from "lottie-react";
-import emptyCartAnim from "../../public/empty-cart.json";
 import { Trash2, Minus, Plus, CircleCheck, AlertTriangle, Package } from "lucide-react";
 import type { NavigateFn } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { createBooking } from "../services/bookings.service";
+
+// Lottie samt Animation (~300 KB) nur laden, wenn der leere Warenkorb angezeigt wird
+const EmptyCartAnimation = React.lazy(async () => {
+  const [{ default: Lottie }, { default: animationData }] = await Promise.all([
+    import("lottie-react"),
+    import("../../public/empty-cart.json"),
+  ]);
+  return { default: () => <Lottie animationData={animationData} loop style={{ width: 140, height: 140 }} /> };
+});
 
 interface CartProps {
   navigate: NavigateFn;
@@ -99,7 +106,9 @@ export default function Cart({ navigate: _navigate }: CartProps): React.ReactEle
 
       {items.length === 0 ? (
         <div style={styles.empty}>
-          <Lottie animationData={emptyCartAnim} loop style={{ width: 140, height: 140 }} />
+          <React.Suspense fallback={<div style={{ width: 140, height: 140 }} />}>
+            <EmptyCartAnimation />
+          </React.Suspense>
           <p style={styles.emptyText}>Dein Warenkorb ist leer</p>
         </div>
       ) : (

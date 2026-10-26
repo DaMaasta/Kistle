@@ -50,4 +50,32 @@ describe('pollManager', () => {
     pollManager.registerLoader(loader);
     expect(mockWebSocket).toHaveBeenCalled();
   });
+
+  it('pollt nicht, solange der WebSocket verbunden ist', () => {
+    const socket = { readyState: 1, close: vi.fn(), onopen: null, onclose: null, onerror: null, onmessage: null };
+    mockWebSocket.mockImplementation(function () { return socket; });
+    const loader = vi.fn();
+    pollManager.registerLoader(loader);
+    vi.advanceTimersByTime(30000);
+    expect(loader).not.toHaveBeenCalled();
+  });
+
+  it('pollt alle 30 Sekunden, wenn der WebSocket getrennt ist', () => {
+    const loader = vi.fn();
+    pollManager.registerLoader(loader);
+    vi.advanceTimersByTime(30000);
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  it('bündelt mehrere WebSocket-Signale zu einem Neuladen', () => {
+    const socket: { readyState: number; close: () => void; onmessage: null | (() => void) } =
+      { readyState: 1, close: vi.fn(), onmessage: null };
+    mockWebSocket.mockImplementation(function () { return socket; });
+    const loader = vi.fn();
+    pollManager.registerLoader(loader);
+    socket.onmessage?.();
+    socket.onmessage?.();
+    vi.advanceTimersByTime(300);
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
 });

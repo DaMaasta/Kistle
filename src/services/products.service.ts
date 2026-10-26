@@ -20,9 +20,10 @@ const store = createCachedStore<RawProduct, Product>({
   lsPrefix: 'kistle_pc_',
   deserialize: deserializeProduct,
   sort: sortProducts,
-  // Product photos are embedded base64 strings and can be large enough to blow the
-  // localStorage quota, which would silently stop names/quantities from being cached too.
-  stripForPersist: (p) => (p.imageUrl ? { ...p, imageUrl: null } : p),
+  // Fotos sind inzwischen kurze /api/images/-URLs und dürfen mitgespeichert werden. Nur
+  // eventuell noch vorhandene Base64-Bilder bleiben draußen, damit sie das localStorage-
+  // Kontingent nicht sprengen und Namen/Mengen nicht mehr gecacht würden.
+  stripForPersist: (p) => (p.imageUrl?.startsWith('data:') ? { ...p, imageUrl: null } : p),
 });
 
 const now = () => new Date();

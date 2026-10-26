@@ -12,9 +12,28 @@ function tick() {
   loaders.forEach(fn => fn());
 }
 
+// Der Server schickt pro Änderung mehrere Signale (z.B. "bookings" und "products").
+// Kurz hintereinander eintreffende Signale lösen nur ein Neuladen aus.
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+const DEBOUNCE_MS = 300;
+
+function scheduleTick() {
+  if (debounceTimer) return;
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null;
+    tick();
+  }, DEBOUNCE_MS);
+}
+
+// Polling nur als Ersatz, solange der WebSocket nicht verbunden ist
+function fallbackTick() {
+  if (ws?.readyState === WebSocket.OPEN) return;
+  tick();
+}
+
 function ensureFallback() {
   if (fallbackTimer || loaders.size === 0) return;
-  fallbackTimer = setInterval(tick, FALLBACK_INTERVAL);
+  fallbackTimer = setInterval(fallbackTick, FALLBACK_INTERVAL);
 }
 
 function maybeStopFallback() {
@@ -34,7 +53,7 @@ function connectWS() {
     };
 
     ws.onmessage = () => {
-      tick();
+      scheduleTick();
     };
 
     ws.onclose = () => {

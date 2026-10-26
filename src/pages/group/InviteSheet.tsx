@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import { UserPlus, X, QrCode, Copy, ExternalLink, Mail } from "lucide-react";
-import QRCodeLib from "qrcode";
 import BottomSheet from "../../components/BottomSheet";
 import { addMember } from "../../services/spaces.service";
 
@@ -25,10 +24,16 @@ export default function InviteSheet({ groupId, isOwner, onClose }: InviteSheetPr
 
   useEffect(() => {
     if (inviteTab !== "qr" || !qrCanvasRef.current) return;
-    QRCodeLib.toCanvas(qrCanvasRef.current, inviteUrl, {
-      width: 160, margin: 1,
-      color: { dark: "#2d3a52", light: "#e0e5ec" },
+    let cancelled = false;
+    // qrcode erst beim Öffnen der Einladung laden, nicht beim App-Start
+    void import("qrcode").then(({ default: QRCodeLib }) => {
+      if (cancelled || !qrCanvasRef.current) return;
+      QRCodeLib.toCanvas(qrCanvasRef.current, inviteUrl, {
+        width: 160, margin: 1,
+        color: { dark: "#2d3a52", light: "#e0e5ec" },
+      });
     });
+    return () => { cancelled = true; };
   }, [inviteTab, inviteUrl]);
 
   const handleCopyLink = async () => {

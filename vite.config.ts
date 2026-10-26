@@ -17,8 +17,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vendor': ['react', 'react-dom'],
-          'mqtt':   ['mqtt'],
-          'scan':   ['qrcode', 'jsqr'],
         },
       },
     },

@@ -1,6 +1,8 @@
 import React, { useState, useRef, useCallback } from "react";
 import { QrCode, Camera, Upload, X } from "lucide-react";
-import jsQR from "jsqr";
+// jsQR (~130 KB) erst laden, wenn tatsächlich gescannt wird
+let jsQRPromise: Promise<typeof import("jsqr").default> | null = null;
+const loadJsQR = () => (jsQRPromise ??= import("jsqr").then((m) => m.default));
 import BottomSheet from "../../components/BottomSheet";
 import { useAuth } from "../../contexts/AuthContext";
 import { joinGroup, getSpace } from "../../services/spaces.service";
@@ -75,6 +77,7 @@ export default function JoinSheet({ onClose, onJoined }: JoinSheetProps): React.
       return;
     }
 
+    const jsQR = await loadJsQR();
     const scan = () => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -101,6 +104,7 @@ export default function JoinSheet({ onClose, onJoined }: JoinSheetProps): React.
     const file = e.target.files?.[0];
     if (!file) return;
     setJoinStep("uploading");
+    const jsQR = await loadJsQR();
     const img = new Image();
     img.src = URL.createObjectURL(file);
     img.onload = () => {
